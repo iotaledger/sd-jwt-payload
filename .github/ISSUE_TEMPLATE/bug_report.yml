@@ -1,0 +1,89 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: "bug"
+body:
+- type: markdown
+  attributes:
+    value: Before raising an issue, please search for existing [issues](https://github.com/iotaledger/template/labels/bug) to avoid creating duplicates. For questions and support please use [Discord](https://discord.iota.org).
+- type: textarea
+  id: bug-description
+  attributes:
+    label: Bug description
+    description: Summarize the bug encountered concisely
+  validations:
+    required: true
+- type: textarea
+  id: expected-behavior
+  attributes:
+    label: Expected behavior
+    description: Describe what you should see instead
+- type: dropdown
+  id: can_repro
+  attributes:
+    label: Can the issue reliably be reproduced?
+    options:
+      - 'Yes'
+      - 'No'
+  validations:
+    required: true
+- type: input
+  id: example-repository
+  attributes:
+    label: Example repository
+    description: If possible, please create a [minimal, reproducible example](https://stackoverflow.com/help/minimal-reproducible-example) of the bug and link it here in the bug report.
+- type: textarea
+  id: steps-to-reproduce
+  attributes:
+    label: Steps to reproduce
+    description: Describe the steps to reproduce the issue
+    placeholder: |
+      1.  
+      2.  
+      3.  
+- type: dropdown
+  id: language
+  attributes:
+    label: Language
+    description: What programming language are you using?
+    options:
+      - Rust
+      - WASM
+      - Node.js
+      - Python
+      - Java
+      - C
+      - Go
+  validations:
+    required: true
+- type: input
+  id: language-version
+  attributes:
+    label: Language Version
+    description: Which version of the language did you use?
+    placeholder: v1.0.0
+  validations:
+    required: true
+- type: input
+  id: version
+  attributes:
+    label: Version
+    description: Which version of our software are you using?
+    placeholder: version number, commit and/or branch
+  validations:
+    required: true
+- type: textarea
+  id: hardware
+  attributes:
+    label: Hardware specifications
+    description: What hardware are you using?
+    value: |  
+      - Operating system:  
+      - RAM:  
+      - Cores:  
+      - Device: 
+- type: textarea
+  id: anything-else
+  attributes:
+    label: Additional info
+    description: Let us know if you have any additional info like logs, erros or screenshots
