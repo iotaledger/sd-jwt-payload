@@ -28,7 +28,7 @@ impl SdObjectDecoder {
   /// Adds a hasher.
   ///
   /// If a hasher for the same algorithm [`Hasher::alg_name`] already exists, it will be replaced and
-  /// the existing hasher will be returned. Otherwise `None`.
+  /// the existing hasher will be returned, otherwise `None`.
   pub fn add_hasher(&mut self, hasher: Box<dyn Hasher>) -> Option<Box<dyn Hasher>> {
     let alg_name = hasher.as_ref().alg_name().to_string();
     let existing_hasher = self.hashers.insert(alg_name.clone(), hasher);
@@ -37,7 +37,7 @@ impl SdObjectDecoder {
 
   /// Removes a hasher.
   ///
-  /// If the hasher for that algorithm exists, it will be removed and returned. Otherwise `None`.
+  /// If the hasher for that algorithm exists, it will be removed and returned, otherwise `None`.
   pub fn remove_hasher(&mut self, hash_alg: String) -> Option<Box<dyn Hasher>> {
     self.hashers.remove(&hash_alg)
   }
@@ -49,7 +49,10 @@ impl SdObjectDecoder {
     object: &Map<String, Value>,
     disclosures: &Vec<String>,
   ) -> Result<Map<String, Value>, crate::Error> {
+    // Determine hasher.
     let hasher = self.determin_hasher(object)?;
+
+    // Create a map of (disclosure digest) → (disclosure).
     let mut disclosures_map: BTreeMap<String, Disclosure> = BTreeMap::new();
     for disclosure in disclosures {
       let parsed_disclosure = Disclosure::parse(disclosure.to_string())?;
@@ -57,18 +60,23 @@ impl SdObjectDecoder {
       disclosures_map.insert(digest, parsed_disclosure);
     }
 
+    // `processed_digests` are kept track of in case on digests appears more than once which
+    // renders the SD-JWT invalid.
     let mut processed_digests: Vec<String> = vec![];
+
+    // Decode the object recursively.
     let (mut decoded, mut changed) = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
     while changed {
       (decoded, changed) = self.decode_object(&decoded, &disclosures_map, &mut processed_digests)?;
     }
 
+    // Remove `_sd_alg` in case it exists.
     decoded.remove("_sd_alg");
     Ok(decoded)
   }
 
-  //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
   fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&Box<dyn Hasher>, Error> {
+    //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
     let alg: &str = if let Some(alg) = object.get("_sd_alg") {
       alg
         .as_str()
@@ -89,10 +97,9 @@ impl SdObjectDecoder {
     let mut changed = false;
     for (key, value) in object.iter() {
       if key == DIGESTS_KEY {
-        let sd_array: &Vec<Value> = value.as_array().ok_or(Error::DataTypeMismatch(format!(
-          "\"{}\" value is not an array",
-          DIGESTS_KEY
-        )))?;
+        let sd_array: &Vec<Value> = value
+          .as_array()
+          .ok_or(Error::DataTypeMismatch(format!("{} is not an array", DIGESTS_KEY)))?;
         for digest in sd_array {
           let digest_str = digest
             .as_str()
@@ -104,6 +111,8 @@ impl SdObjectDecoder {
             return Err(Error::DuplicateDigestError(digest_str));
           }
 
+          // Check if a disclosure of this digest is available
+          // and insert its claim name and value in the object.
           if let Some(disclosure) = disclosures.get(&digest_str) {
             let claim_name = disclosure.claim_name.clone().ok_or(Error::DataTypeMismatch(format!(
               "disclosure type error: {}",
@@ -191,6 +200,7 @@ impl SdObjectDecoder {
         }
       } else {
         output.push(value.clone());
+        //to do: arrays in arrays can have disclosuers?
       }
     }
 
