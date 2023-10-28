@@ -6,6 +6,7 @@ use rand::{distributions::DistString, Rng};
 use serde_json::{json, Map, Value};
 
 pub(crate) const DIGESTS_KEY: &str = "_sd";
+pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
@@ -61,6 +62,10 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// Substitutes a value with the digest of its disclosure.
   /// If no salt is provided, the disclosure will be created with random salt value.
   ///
+  /// The value of the key specified in `path` will be concealed. E.g. for path
+  /// `["claim", "subclaim"]` the value of `claim.subclaim` will be concealed.
+  /// The path slice must not be empty.
+  ///
   /// Note: use `conceal_array_entry` for values in arrays.
   pub fn conceal(&mut self, path: &[&str], salt: Option<String>) -> Result<Disclosure> {
     // Error if path is not provided.
@@ -93,6 +98,11 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
   /// Substitutes a value within an array with the digest of its disclosure.
   /// If no salt is provided, the disclosure will be created with random salt value.
+  ///
+  /// `path` is used to specify the array in the object, while `element_index` specifies
+  /// the index of the element to be concealed.
+  ///
+  /// The path slice must not be empty.
   pub fn conceal_array_entry(
     &mut self,
     path: &[&str],
@@ -121,7 +131,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     if let Some(element_value) = array.get_mut(element_index) {
       let disclosure = Disclosure::new(salt, None, element_value.clone());
       let hash = Utils::digest_b64_url_only_ascii(&self.hasher, disclosure.as_str());
-      let tripledot = json!({"...": hash});
+      let tripledot = json!({ARRAY_DIGEST_KEY: hash});
       *element_value = tripledot;
       Ok(disclosure)
     } else {
@@ -198,7 +208,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
         return Ok(disclosure);
       } else if let Some(array) = value.as_array_mut() {
         let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
-        let tripledot = json!({"...": hash});
+        let tripledot = json!({ARRAY_DIGEST_KEY: hash});
         array.push(tripledot);
         return Ok(disclosure);
       } else {
@@ -256,23 +266,61 @@ impl<H: Hasher> SdObjectEncoder<H> {
 #[cfg(test)]
 mod test {
   use super::SdObjectEncoder;
+  use crate::Error;
   use crate::ShaHasher;
   use serde_json::json;
 
   #[test]
   fn test() {
-    let json = json!({
+    let object = json!({
       "id": "did:value",
       "claim1": {
         "abc": true
       },
       "claim2": ["arr-value1", "arr-value2"]
     });
-    let stringi = json.to_string();
-    let mut encoder = SdObjectEncoder::<ShaHasher>::new(&stringi).unwrap();
+    let object_string = object.to_string();
+    let mut encoder = SdObjectEncoder::<ShaHasher>::new(&object_string).unwrap();
     encoder.conceal(&["claim1", "abc"], None).unwrap();
     encoder.conceal(&["id"], None).unwrap();
     encoder.add_decoys(&[], 10).unwrap();
+    encoder.add_decoys(&["claim2"], 10).unwrap();
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
+    assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
+    println!(
+      "encoded object: {}",
+      serde_json::to_string_pretty(&encoder.object()).unwrap()
+    );
+  }
+
+  #[test]
+  fn test_wront_path() {
+    let object = json!({
+      "id": "did:value",
+      "claim1": [
+        "abc"
+      ],
+    });
+    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    assert!(matches!(
+      encoder.conceal(&["claim12"], None).unwrap_err(),
+      Error::InvalidPath(_)
+    ));
+    assert!(matches!(
+      encoder.conceal_array_entry(&["claim12"], 0, None).unwrap_err(),
+      Error::InvalidPath(_)
+    ));
+  }
+
+  #[test]
+  fn sd_alg() {
+    let object = json!({
+      "id": "did:value",
+      "claim1": [
+        "abc"
+      ],
+    });
+    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    encoder.add_sd_alg_property();
   }
 }

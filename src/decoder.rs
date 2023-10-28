@@ -1,4 +1,4 @@
-use crate::{Utils, DIGESTS_KEY};
+use crate::{Utils, ARRAY_DIGEST_KEY, DIGESTS_KEY};
 
 use super::{Disclosure, Hasher, ShaHasher};
 use crate::Error;
@@ -44,6 +44,12 @@ impl SdObjectDecoder {
 
   /// Decodes an SD-JWT `object` containing by Substituting the digests with their corresponding
   /// plaintext values provided by `disclosures`.
+  ///
+  /// ## Notes
+  /// * The hasher is determined by the `_sd_alg` property. If none is set, the sha-256 hasher will
+  /// be used, if present.
+  /// * Claims like `exp` or `iat` are not validated in the process of decoding.
+  /// * `_sd_alg` property will be removed if present.
   pub fn decode(
     &self,
     object: &Map<String, Value>,
@@ -65,10 +71,7 @@ impl SdObjectDecoder {
     let mut processed_digests: Vec<String> = vec![];
 
     // Decode the object recursively.
-    let (mut decoded, mut changed) = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
-    while changed {
-      (decoded, changed) = self.decode_object(&decoded, &disclosures_map, &mut processed_digests)?;
-    }
+    let mut decoded = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
 
     // Remove `_sd_alg` in case it exists.
     decoded.remove("_sd_alg");
@@ -92,9 +95,8 @@ impl SdObjectDecoder {
     object: &Map<String, Value>,
     disclosures: &BTreeMap<String, Disclosure>,
     processed_digests: &mut Vec<String>,
-  ) -> Result<(Map<String, Value>, bool), Error> {
+  ) -> Result<Map<String, Value>, Error> {
     let mut output: Map<String, Value> = object.clone();
-    let mut changed = false;
     for (key, value) in object.iter() {
       if key == DIGESTS_KEY {
         let sd_array: &Vec<Value> = value
@@ -123,8 +125,15 @@ impl SdObjectDecoder {
               return Err(Error::ClaimCollisionError(claim_name));
             }
 
-            output.insert(claim_name, disclosure.claim_value.clone());
-            changed = true;
+            let recursively_decoded = match disclosure.claim_value {
+              Value::Array(ref sub_arr) => Value::Array(self.decode_array(sub_arr, disclosures, processed_digests)?),
+              Value::Object(ref sub_obj) => {
+                Value::Object(self.decode_object(sub_obj, disclosures, processed_digests)?)
+              }
+              _ => disclosure.claim_value.clone(),
+            };
+
+            output.insert(claim_name, recursively_decoded);
           }
         }
         output.remove(DIGESTS_KEY);
@@ -133,19 +142,13 @@ impl SdObjectDecoder {
 
       match value {
         Value::Object(object) => {
-          let (mut decoded_object, mut changed) = self.decode_object(object, disclosures, processed_digests)?;
-          while changed {
-            (decoded_object, changed) = self.decode_object(&decoded_object, disclosures, processed_digests)?;
-          }
+          let decoded_object = self.decode_object(object, disclosures, processed_digests)?;
           if !decoded_object.is_empty() {
             output.insert(key.to_string(), Value::Object(decoded_object));
           }
         }
         Value::Array(array) => {
-          let (mut decoded_array, mut changed) = self.decode_array(array, disclosures, processed_digests)?;
-          while changed {
-            (decoded_array, changed) = self.decode_array(&decoded_array, disclosures, processed_digests)?;
-          }
+          let decoded_array = self.decode_array(array, disclosures, processed_digests)?;
           if !decoded_array.is_empty() {
             output.insert(key.to_string(), Value::Array(decoded_array));
           }
@@ -153,7 +156,7 @@ impl SdObjectDecoder {
         _ => {}
       }
     }
-    Ok((output, changed))
+    Ok(output)
   }
 
   fn decode_array(
@@ -161,14 +164,12 @@ impl SdObjectDecoder {
     array: &Vec<Value>,
     disclosures: &BTreeMap<String, Disclosure>,
     processed_digests: &mut Vec<String>,
-  ) -> Result<(Vec<Value>, bool), Error> {
+  ) -> Result<Vec<Value>, Error> {
     let mut output: Vec<Value> = vec![];
-    let mut changed = false;
-
     for value in array.iter() {
       if let Some(object) = value.as_object() {
         for (key, value) in object.iter() {
-          if key == "..." {
+          if key == ARRAY_DIGEST_KEY {
             if object.keys().len() != 1 {
               return Err(Error::InvalidArrayDisclosureObject);
             }
@@ -185,25 +186,59 @@ impl SdObjectDecoder {
 
             if let Some(disclosure) = disclosures.get(&digest_in_array) {
               if disclosure.claim_name.is_some() {
-                panic!("array length must be 2");
+                return Err(Error::InvalidDisclosure("array length must be 2".to_string()));
               }
-              output.push(disclosure.claim_value.clone());
-              changed = true;
+              // Recursively decoded the disclosed values.
+              let recursively_decoded = match disclosure.claim_value {
+                Value::Array(ref sub_arr) => {
+                  Value::Array(self.decode_array(sub_arr, disclosures, processed_digests)?)
+                }
+                Value::Object(ref sub_obj) => {
+                  Value::Object(self.decode_object(sub_obj, disclosures, processed_digests)?)
+                }
+                _ => disclosure.claim_value.clone(),
+              };
+
+              output.push(recursively_decoded);
             }
           } else {
-            let (mut decoded_object, mut changed) = self.decode_object(object, disclosures, processed_digests)?;
-            while changed {
-              (decoded_object, changed) = self.decode_object(&decoded_object, disclosures, processed_digests)?;
-            }
+            let decoded_object = self.decode_object(object, disclosures, processed_digests)?;
             output.push(Value::Object(decoded_object));
           }
         }
+      } else if let Some(arr) = value.as_array() {
+        // Nested arrays need to be decoded too.
+        let decoded = self.decode_array(arr, disclosures, processed_digests)?;
+        output.push(Value::Array(decoded));
       } else {
+        // Append the rest of the values.
         output.push(value.clone());
-        //to do: arrays in arrays can have disclosuers?
       }
     }
 
-    Ok((output, changed))
+    Ok(output)
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use serde_json::json;
+
+  use crate::{SdObjectDecoder, SdObjectEncoder};
+
+  #[test]
+  fn sd_alg() {
+    let object = json!({
+      "id": "did:value",
+      "claim1": [
+        "abc"
+      ],
+    });
+    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    encoder.add_sd_alg_property();
+    assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
+    let decoder = SdObjectDecoder::new_with_sha256_hasher();
+    let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
+    assert!(decoded.get("_sd_alg").is_none());
   }
 }
