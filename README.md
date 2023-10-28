@@ -154,7 +154,7 @@ Now `encoder.object()` will return the encoded object.
 
 ### Creating/Parsing SD-JWT
 
-Sinec creating JWTs is outside the scope of this library, see the full [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create the JWT and how it's used to create the SD-JWT through [`SdJwt`](./src/sd_jwt.rs).
+Since creating JWTs is outside the scope of this library, see the full [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create the JWT and how it's used to create the SD-JWT through [`SdJwt`](./src/sd_jwt.rs).
 
 ### Decoding
 
