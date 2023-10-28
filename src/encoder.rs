@@ -1,4 +1,4 @@
-use super::{Disclosure, Hasher, ShaHasher};
+use super::{Disclosure, Hasher, Sha256Hasher};
 use crate::Error;
 use crate::Result;
 use crate::Utils;
@@ -10,7 +10,7 @@ pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
-pub struct SdObjectEncoder<H: Hasher = ShaHasher> {
+pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   /// The object in JSON object format.
   pub object: Map<String, Value>,
   /// Length of the salts that generated for disclosures.
@@ -25,11 +25,11 @@ impl SdObjectEncoder {
   ///
   /// ## Error
   /// Returns [`Error::DeserializationError`] if `object` is not a valid JSON object.
-  pub fn new(object: &str) -> Result<SdObjectEncoder<ShaHasher>> {
+  pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
     Ok(SdObjectEncoder {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
       salt_length: rand::thread_rng().gen_range(24..34),
-      hasher: ShaHasher::new(),
+      hasher: Sha256Hasher::new(),
     })
   }
 }
@@ -42,7 +42,7 @@ impl TryFrom<Value> for SdObjectEncoder {
       Value::Object(object) => Ok(SdObjectEncoder {
         object,
         salt_length: rand::thread_rng().gen_range(24..34),
-        hasher: ShaHasher::new(),
+        hasher: Sha256Hasher::new(),
       }),
       _ => Err(Error::DataTypeMismatch("Expected object".to_owned())),
     }
@@ -100,7 +100,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// If no salt is provided, the disclosure will be created with random salt value.
   ///
   /// `path` is used to specify the array in the object, while `element_index` specifies
-  /// the index of the element to be concealed.
+  /// the index of the element to be concealed (index start at 0).
   ///
   /// The path slice must not be empty.
   pub fn conceal_array_entry(
@@ -255,6 +255,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   fn gen_rand(len: usize) -> String {
+    // todo: check if random is cryptographically secure.
     rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), len)
   }
 
@@ -267,7 +268,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
 mod test {
   use super::SdObjectEncoder;
   use crate::Error;
-  use crate::ShaHasher;
+  use crate::Sha256Hasher;
   use serde_json::json;
 
   #[test]
@@ -280,7 +281,7 @@ mod test {
       "claim2": ["arr-value1", "arr-value2"]
     });
     let object_string = object.to_string();
-    let mut encoder = SdObjectEncoder::<ShaHasher>::new(&object_string).unwrap();
+    let mut encoder = SdObjectEncoder::<Sha256Hasher>::new(&object_string).unwrap();
     encoder.conceal(&["claim1", "abc"], None).unwrap();
     encoder.conceal(&["id"], None).unwrap();
     encoder.add_decoys(&[], 10).unwrap();
@@ -294,7 +295,7 @@ mod test {
   }
 
   #[test]
-  fn test_wront_path() {
+  fn test_wrong_path() {
     let object = json!({
       "id": "did:value",
       "claim1": [
@@ -310,17 +311,5 @@ mod test {
       encoder.conceal_array_entry(&["claim12"], 0, None).unwrap_err(),
       Error::InvalidPath(_)
     ));
-  }
-
-  #[test]
-  fn sd_alg() {
-    let object = json!({
-      "id": "did:value",
-      "claim1": [
-        "abc"
-      ],
-    });
-    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
-    encoder.add_sd_alg_property();
   }
 }

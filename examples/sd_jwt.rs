@@ -2,7 +2,7 @@ use josekit::{
   jws::{JwsHeader, HS256},
   jwt::{self, JwtPayload},
 };
-use sd_jwt_payload::{Disclosure, SdJwt, SdObjectDecoder, SdObjectEncoder};
+use sd_jwt::{Disclosure, SdJwt, SdObjectDecoder, SdObjectEncoder};
 use serde_json::json;
 
 fn main() {

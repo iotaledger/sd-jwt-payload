@@ -9,17 +9,17 @@ pub trait Hasher: Sync + Send {
 }
 
 /// An implementation of [`Hasher`] that uses the `sha-256` hash function.
-pub struct ShaHasher;
+pub struct Sha256Hasher;
 
-impl ShaHasher {
+impl Sha256Hasher {
   pub const ALG_NAME: &str = "sha-256";
   /// Creates a new [`ShaHasher`]
   pub fn new() -> Self {
-    ShaHasher {}
+    Sha256Hasher {}
   }
 }
 
-impl Hasher for ShaHasher {
+impl Hasher for Sha256Hasher {
   fn digest(&self, input: &[u8]) -> Vec<u8> {
     let mut digest: [u8; SHA256_LEN] = Default::default();
     SHA256(input, &mut digest);
@@ -27,6 +27,6 @@ impl Hasher for ShaHasher {
   }
 
   fn alg_name(&self) -> &'static str {
-    ShaHasher::ALG_NAME
+    Sha256Hasher::ALG_NAME
   }
 }

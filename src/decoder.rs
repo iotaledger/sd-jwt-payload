@@ -1,6 +1,6 @@
 use crate::{Utils, ARRAY_DIGEST_KEY, DIGESTS_KEY};
 
-use super::{Disclosure, Hasher, ShaHasher};
+use super::{Disclosure, Hasher, Sha256Hasher};
 use crate::Error;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -21,7 +21,7 @@ impl SdObjectDecoder {
   /// Creates a new [`SdObjectDecoder`] with `sha-256` hasher.
   pub fn new_with_sha256_hasher() -> Self {
     let mut hasher = Self::new();
-    hasher.add_hasher(Box::new(ShaHasher::new()));
+    hasher.add_hasher(Box::new(Sha256Hasher::new()));
     hasher
   }
 
@@ -85,7 +85,7 @@ impl SdObjectDecoder {
         .as_str()
         .ok_or(Error::DataTypeMismatch("`_sd_alg` is not a string".to_string()))?
     } else {
-      ShaHasher::ALG_NAME
+      Sha256Hasher::ALG_NAME
     };
     self.hashers.get(alg).ok_or(Error::HashingAlgorithmError)
   }
