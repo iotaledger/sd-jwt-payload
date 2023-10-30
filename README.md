@@ -47,8 +47,10 @@ This library supports
 * **Decoding**  
   - Recursively replace digests in objects and arrays with their corresponding disclosure value.
 
+`Sha-256` hash function is shipped by default, encoding/decoding with other hash functions is possible. 
+
 ## Getting started
-//todo
+ToDo
 
 ## Examples
 
@@ -66,7 +68,9 @@ This library consists of the major structs:
 
 
 ### Encoding
-Any JSON object can be encoded, for the following object
+Any JSON object can be encoded
+
+
 ```rust
   let object = json!({
     "given_name": "John",
@@ -82,7 +86,6 @@ Any JSON object can be encoded, for the following object
   });
 ```
 
-create an `SdObjectEncoder`
 
 ```rust
   let mut encoder = SdObjectEncoder::try_from(object).unwrap();
@@ -91,7 +94,7 @@ This creates a stateful encoder with `Sha-256` hash function by default to creat
 
 *Note: `SdObjectEncoder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-The encoder can encode any of the object's value's or any array element, using the `conceal` method. Suppose the value of `region` should be selectively disclosed as well as the value of `address` and the second `phone` value.
+The encoder can encode any of the object's values or any array element, using the `conceal` and `conceal_array_entry` methods respectively. Suppose the value of `region` should be selectively disclosed as well as the value of `address` and the first `phone` value.
 
 ```rust
   let disclosure1 = encoder.conceal(&["address", "street_address"], None).unwrap();
@@ -100,15 +103,15 @@ The encoder can encode any of the object's value's or any array element, using t
 ```
 
 ```
-"WyJzR05xSUVNc1R2TEdzMTZHbTFleURvbzJtIiwgInN0cmVldF9hZGRyZXNzIiwgIjEyMyBNYWluIFN0Il0"
-"WyJvbUVmQlhuQjRoWUpjYWVKamFIaHI0dDFKIiwgImFkZHJlc3MiLCB7InJlZ2lvbiI6IkFueXN0YXRlIiwiX3NkIjpbIjd4cjBUSElKOGxBN0ZTa2hQWEZYb09LQXA5a3dXR3lSR211R013Rk1PQjAiXX1d"
-"WyJQTXJ6ZGV3SmgzY1pOMEhUY0ZQZGNQRjVUIiwgIis0OSAxMjM0NTYiXQ"
+"WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ"
+"WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0"
+"WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd"
 ```
 The encoder also supports adding decoys. Suppose the amount of phone numbers and the amount of claims needs to be hidden.
 
 ```rust
-  encoder.add_decoys(&["phone"], 3).unwrap();
-  encoder.add_decoys(&[], 6).unwrap();
+  encoder.add_decoys(&["phone"], 3).unwrap(); //Adds 3 decoys to the array `phone`.
+  encoder.add_decoys(&[], 6).unwrap(); // Adds 6 decoys to the top level object.
 ```
 
 Add the hash function claim.
@@ -124,47 +127,60 @@ Now `encoder.object()` will return the encoded object.
   "family_name": "Doe",
   "phone": [
     {
-      "...": "zqCKmYhtxOIaq5gLHsTwQ3UQ0z3quxa1KMUN0tHEi3Y"
+      "...": "eZVn0KkQm_T8x-x57VxYt-_MmNG91Sh34E-bZEnNfWY"
     },
     "+49 234567",
     {
-      "...": "RhQdZloNShJxwz4r35BWYAMNWL5pE7bCkmwEqRxwYE0"
+      "...": "KAiJIx0tktQRXBxZSBVVld9298bZIp2WkpkDYDa3CWQ"
     },
     {
-      "...": "vIDM6PQidUgI0hcLUtR6qVCiS3-CaBf89x9N2r2XAu4"
+      "...": "CBKARPh6sdTCJyliZ7pBOYzix7Z4Bb4yRh0EykHX2Uw"
     },
     {
-      "...": "LCqYyQD9kV18ndKZzNxMSr0ltDV8m6Nznhtm11IZznE"
+      "...": "oi1KgsYXgqBFXUXvbVaHSGYYaWhkB5RL55T90Gl_5s0"
     }
   ],
   "_sd": [
-    "sLmmzUH4_wvp6pkFxvhAwpEZvWZDYDl_OnPoUcqb330",
-    "-8vMUT-_K5UtZACaM-kG3ACrxk6fS3rDrwJ9hpXLWCI",
-    "QfSuYv2zx06eVxsL16QIdNnAGV8mn79FrN6PfZxMl3Y",
-    "NTO4mVnuLRgAeTMWqdcWri90dEd4Ul38-1dU-bwEtEY",
-    "dj1gxBb6Pwga4ggv2aGIrPRLOPl9Kgy6DEP4-mX_mDY",
-    "7IbILNpUgcsFfwOcovbwaqwDqdqD13rM0fqjJwOtOTg",
-    "U5x5qGVCk4gGVRjfx8Dv1BlXZICIaw9EDXqKu6i_A1U"
+    "Jj5jBeGEawY6vRvmHDg55EjeAIP8FVhWEV2FczhUXrY",
+    "8eqphBPJyCBgUJhNWNP7ci-Y79N615wpZQrxi5D4ju8",
+    "_hOU5puJjNzSBhK0bwh3h8_b6H6nN7vd_7I0uTp80Mo",
+    "G_tH70MrfCkVM0HhsH9REObIt1Ei19477y6CEsS0Zlo",
+    "zP56MeH0ryjzqh9Kadrb5C9Z2BE2FWg8nb3g0rR3LSA",
+    "dgfVW11ip9OOyVi8M4h1RjXK8akw7ICeMQkjUwSI6iU",
+    "Bx33mOyTF5-w8gRS5yL4YQ4dig44V3lmHxk1WRss_7U"
   ],
   "_sd_alg": "sha-256"
 }
 ```
 
-*Note: no JWT values like `exp` or `iat` are added. These need to be added and validated manually.*
+*Note: no JWT values like `exp` or `iat` are added. If necessary, these need to be added and validated manually.*
 
-### Creating/Parsing SD-JWT
+### Creating SD-JWT
 
-Since creating JWTs is outside the scope of this library, see the full [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create the JWT and how it's used to create the SD-JWT through [`SdJwt`](./src/sd_jwt.rs).
+Since creating JWTs is outside the scope of this library, see [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create `jwt` with the object above as the claim set.
+
+```rust
+  let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
+  let sd_jwt: String = sd_jwt.to_string();
+```
+
+```
+eyJ0eXAiOiJTRC1KV1QiLCJhbGciOiJIUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwicGhvbmUiOlt7Ii4uLiI6ImVaVm4wS2tRbV9UOHgteDU3VnhZdC1fTW1ORzkxU2gzNEUtYlpFbk5mV1kifSwiKzQ5IDIzNDU2NyIseyIuLi4iOiJLQWlKSXgwdGt0UVJYQnhaU0JWVmxkOTI5OGJaSXAyV2twa0RZRGEzQ1dRIn0seyIuLi4iOiJDQktBUlBoNnNkVENKeWxpWjdwQk9Zeml4N1o0QmI0eVJoMEV5a0hYMlV3In0seyIuLi4iOiJvaTFLZ3NZWGdxQkZYVVh2YlZhSFNHWVlhV2hrQjVSTDU1VDkwR2xfNXMwIn1dLCJfc2QiOlsiSmo1akJlR0Vhd1k2dlJ2bUhEZzU1RWplQUlQOEZWaFdFVjJGY3poVVhyWSIsIjhlcXBoQlBKeUNCZ1VKaE5XTlA3Y2ktWTc5TjYxNXdwWlFyeGk1RDRqdTgiLCJfaE9VNXB1SmpOelNCaEswYndoM2g4X2I2SDZuTjd2ZF83STB1VHA4ME1vIiwiR190SDcwTXJmQ2tWTTBIaHNIOVJFT2JJdDFFaTE5NDc3eTZDRXNTMFpsbyIsInpQNTZNZUgwcnlqenFoOUthZHJiNUM5WjJCRTJGV2c4bmIzZzByUjNMU0EiLCJkZ2ZWVzExaXA5T095Vmk4TTRoMVJqWEs4YWt3N0lDZU1Ra2pVd1NJNmlVIiwiQngzM21PeVRGNS13OGdSUzV5TDRZUTRkaWc0NFYzbG1IeGsxV1Jzc183VSJdLCJfc2RfYWxnIjoic2hhLTI1NiJ9.knTqw4FMCplHoMu7mfiix7dv4lIjYgRIn-tmuemAhbY~WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ~WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0~WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd~
+```
 
 ### Decoding
 
-Decoding the previous object by passing all the returned disclosures `vec![disclosure1, disclosure2, disclosure3]` 
+Parse the SD-JWT string to extract the JWT and the disclosures in order to decode the claims and construct the disclosed values.
+
+*Note: Validating the signature of the JWT and extracting the claim set is outside the scope of this library.
 
 ```rust
+  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string).unwrap();
+  let claims_set: // extract claims from `sd_jwt.jwt`.
   let decoder = SdObjectDecoder::new_with_sha256_hasher();
-  let decoded = decoder.decode(encoder.object(), &disclosures).unwrap();
+  let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures).unwrap();
 ```
-`decoded`:
+`decoded_object`:
 
 ```json
 {
