@@ -102,7 +102,7 @@ fn test_complex_structure() {
 
   // Decoding the SD-JWT
   // Extract the payload from the JWT of the SD-JWT after verifying the signature.
-  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt).unwrap();
+  let sd_jwt: SdJwt = SdJwt::parse(&sd_jwt).unwrap();
   let verifier = HS256.verifier_from_bytes(key).unwrap();
   let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &verifier).unwrap();
 

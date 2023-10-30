@@ -240,7 +240,7 @@ Distributed under the Apache License. See `LICENSE` for more information.
 [issues-shield]: https://img.shields.io/github/issues/iotaledger/template.svg?style=for-the-badge
 [issues-url]: https://github.com/iotaledger/template/issues
 [license-shield]: https://img.shields.io/github/license/iotaledger/template.svg?style=for-the-badge
-[license-url]: https://github.com/iotaledger/template/blob/main/LICENSE
+[license-url]: https://github.com/iotaledger/sd-jwt/blob/main/LICENSE
 [discord-shield]: https://img.shields.io/badge/Discord-9cf.svg?style=for-the-badge&logo=discord
 [discord-url]: https://discord.iota.org
 [stackexchange-shield]: https://img.shields.io/badge/StackExchange-9cf.svg?style=for-the-badge&logo=stackexchange

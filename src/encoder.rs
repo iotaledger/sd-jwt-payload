@@ -11,7 +11,7 @@ pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
 pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
-  /// The object in JSON object format.
+  /// The object in JSON format.
   pub object: Map<String, Value>,
   /// Length of the salts that generated for disclosures.
   /// Constant length for readability considerations.
@@ -60,13 +60,17 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Substitutes a value with the digest of its disclosure.
-  /// If no salt is provided, the disclosure will be created with random salt value.
+  /// If no salt is provided, the disclosure will be created with a random salt value.
   ///
   /// The value of the key specified in `path` will be concealed. E.g. for path
   /// `["claim", "subclaim"]` the value of `claim.subclaim` will be concealed.
-  /// The path slice must not be empty.
   ///
-  /// Note: use `conceal_array_entry` for values in arrays.
+  /// ## Error
+  /// [`Error::InvalidPath`] if path is invalid or the path slice is empty.
+  /// [`Error::DataTypeMismatch`] if existing SD format is invalid.
+  ///
+  /// ## Note
+  /// Use `conceal_array_entry` for values in arrays.
   pub fn conceal(&mut self, path: &[&str], salt: Option<String>) -> Result<Disclosure> {
     // Error if path is not provided.
     if path.len() == 0 {
@@ -102,7 +106,10 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// `path` is used to specify the array in the object, while `element_index` specifies
   /// the index of the element to be concealed (index start at 0).
   ///
-  /// The path slice must not be empty.
+  /// ## Error
+  /// [`Error::InvalidPath`] if path is invalid or the path slice is empty.
+  /// [`Error::DataTypeMismatch`] if existing SD format is invalid.
+  /// [`Error::IndexOutofBounds`] if `element_index` is out of bounds.
   pub fn conceal_array_entry(
     &mut self,
     path: &[&str],
@@ -268,41 +275,44 @@ impl<H: Hasher> SdObjectEncoder<H> {
 mod test {
   use super::SdObjectEncoder;
   use crate::Error;
-  use crate::Sha256Hasher;
   use serde_json::json;
+  use serde_json::Value;
 
-  #[test]
-  fn test() {
-    let object = json!({
+  fn object() -> Value {
+    json!({
       "id": "did:value",
       "claim1": {
         "abc": true
       },
       "claim2": ["arr-value1", "arr-value2"]
-    });
-    let object_string = object.to_string();
-    let mut encoder = SdObjectEncoder::<Sha256Hasher>::new(&object_string).unwrap();
+    })
+  }
+
+  #[test]
+  fn simple() {
+    let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
     encoder.conceal(&["claim1", "abc"], None).unwrap();
     encoder.conceal(&["id"], None).unwrap();
     encoder.add_decoys(&[], 10).unwrap();
     encoder.add_decoys(&["claim2"], 10).unwrap();
+    assert!(encoder.object().get("id").is_none());
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
     assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
-    println!(
-      "encoded object: {}",
-      serde_json::to_string_pretty(&encoder.object()).unwrap()
-    );
+  }
+
+  #[test]
+  fn errors() {
+    let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
+    encoder.conceal(&["claim1", "abc"], None).unwrap();
+    assert!(matches!(
+      encoder.conceal_array_entry(&["claim2"], 2, None).unwrap_err(),
+      Error::IndexOutofBounds
+    ));
   }
 
   #[test]
   fn test_wrong_path() {
-    let object = json!({
-      "id": "did:value",
-      "claim1": [
-        "abc"
-      ],
-    });
-    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
     assert!(matches!(
       encoder.conceal(&["claim12"], None).unwrap_err(),
       Error::InvalidPath(_)

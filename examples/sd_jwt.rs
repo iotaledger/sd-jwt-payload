@@ -49,7 +49,7 @@ fn main() {
   // Create the JWT.
   // Creating JWTs is out of the scope of this library, josekit is used here as an example
   let mut header = JwsHeader::new();
-  header.set_token_type("SD-JWT");
+  header.set_token_type("sd-jwt");
 
   // Use the encoded object as a payload for the JWT.
   let payload = JwtPayload::from_map(encoder.object().clone()).unwrap();
@@ -67,7 +67,7 @@ fn main() {
 
   // Decoding the SD-JWT
   // Extract the payload from the JWT of the SD-JWT after verifying the signature.
-  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt).unwrap();
+  let sd_jwt: SdJwt = SdJwt::parse(&sd_jwt).unwrap();
   let verifier = HS256.verifier_from_bytes(key).unwrap();
   let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &verifier).unwrap();
 
