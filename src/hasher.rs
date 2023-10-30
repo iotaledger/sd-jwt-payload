@@ -9,6 +9,7 @@ pub trait Hasher: Sync + Send {
 }
 
 /// An implementation of [`Hasher`] that uses the `sha-256` hash function.
+#[derive(Default)]
 pub struct Sha256Hasher;
 
 impl Sha256Hasher {

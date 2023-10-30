@@ -31,8 +31,8 @@ impl SdObjectDecoder {
   /// the existing hasher will be returned, otherwise `None`.
   pub fn add_hasher(&mut self, hasher: Box<dyn Hasher>) -> Option<Box<dyn Hasher>> {
     let alg_name = hasher.as_ref().alg_name().to_string();
-    let existing_hasher = self.hashers.insert(alg_name.clone(), hasher);
-    existing_hasher
+
+    self.hashers.insert(alg_name.clone(), hasher)
   }
 
   /// Removes a hasher.
@@ -62,7 +62,7 @@ impl SdObjectDecoder {
     let mut disclosures_map: BTreeMap<String, Disclosure> = BTreeMap::new();
     for disclosure in disclosures {
       let parsed_disclosure = Disclosure::parse(disclosure.to_string())?;
-      let digest = Utils::digest_b64_url_only_ascii(&**hasher, disclosure.as_str());
+      let digest = Utils::digest_b64_url_only_ascii(hasher, disclosure.as_str());
       disclosures_map.insert(digest, parsed_disclosure);
     }
 
@@ -78,7 +78,7 @@ impl SdObjectDecoder {
     Ok(decoded)
   }
 
-  fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&Box<dyn Hasher>, Error> {
+  fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
     //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
     let alg: &str = if let Some(alg) = object.get("_sd_alg") {
       alg
@@ -87,7 +87,11 @@ impl SdObjectDecoder {
     } else {
       Sha256Hasher::ALG_NAME
     };
-    self.hashers.get(alg).ok_or(Error::HashingAlgorithmError)
+    self
+      .hashers
+      .get(alg)
+      .map(AsRef::as_ref)
+      .ok_or(Error::HashingAlgorithmError)
   }
 
   fn decode_object(
@@ -118,7 +122,7 @@ impl SdObjectDecoder {
           if let Some(disclosure) = disclosures.get(&digest_str) {
             let claim_name = disclosure.claim_name.clone().ok_or(Error::DataTypeMismatch(format!(
               "disclosure type error: {}",
-              disclosure.to_string()
+              disclosure
             )))?;
 
             if output.contains_key(&claim_name) {
@@ -161,7 +165,7 @@ impl SdObjectDecoder {
 
   fn decode_array(
     &self,
-    array: &Vec<Value>,
+    array: &[Value],
     disclosures: &BTreeMap<String, Disclosure>,
     processed_digests: &mut Vec<String>,
   ) -> Result<Vec<Value>, Error> {
@@ -217,6 +221,12 @@ impl SdObjectDecoder {
     }
 
     Ok(output)
+  }
+}
+
+impl Default for SdObjectDecoder {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

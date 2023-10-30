@@ -73,7 +73,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// Use `conceal_array_entry` for values in arrays.
   pub fn conceal(&mut self, path: &[&str], salt: Option<String>) -> Result<Disclosure> {
     // Error if path is not provided.
-    if path.len() == 0 {
+    if path.is_empty() {
       return Err(Error::InvalidPath("the provided path length is 0".to_string()));
     }
 
@@ -117,7 +117,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     salt: Option<String>,
   ) -> Result<Disclosure> {
     // Error if path is not provided.
-    if path.len() == 0 {
+    if path.is_empty() {
       return Err(Error::InvalidPath("the provided path length is 0".to_string()));
     }
 
@@ -181,10 +181,8 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
   /// Returns the modified object as a string.
   pub fn to_string(&self) -> Result<String> {
-    Ok(
-      serde_json::to_string(&self.object)
-        .map_err(|_e| Error::Unspecified("error while serializing internal object".to_string()))?,
-    )
+    serde_json::to_string(&self.object)
+      .map_err(|_e| Error::Unspecified("error while serializing internal object".to_string()))
   }
 
   /// Adds a decoy digest to the specified path.
@@ -198,10 +196,10 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   fn add_decoy(&mut self, path: &[&str]) -> Result<Disclosure> {
-    if path.len() == 0 {
+    if path.is_empty() {
       let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
       Self::add_digest_to_object(&mut self.object, hash)?;
-      return Ok(disclosure);
+      Ok(disclosure)
     } else {
       let (target_key, parent_value) = Self::get_target_property_and_its_parent(&mut self.object, path)?;
 
@@ -212,7 +210,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
       if let Some(object) = value.as_object_mut() {
         let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
         Self::add_digest_to_object(object, hash)?;
-        return Ok(disclosure);
+        Ok(disclosure)
       } else if let Some(array) = value.as_array_mut() {
         let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});

@@ -63,7 +63,7 @@ fn main() {
     .map(|disclosure| disclosure.to_string())
     .collect();
   let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
-  let sd_jwt: String = sd_jwt.to_string();
+  let sd_jwt: String = sd_jwt.presentation();
 
   // Decoding the SD-JWT
   // Extract the payload from the JWT of the SD-JWT after verifying the signature.

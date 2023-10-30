@@ -8,7 +8,7 @@ impl Utils {
     let ascii_bytes: Vec<u8> = input.as_bytes().iter().cloned().filter(|&byte| byte <= 127).collect();
     let hash = hasher.digest(&ascii_bytes);
     // "The bytes of the digest MUST then be base64url-encoded".
-    multibase::Base::from(multibase::Base::Base64Url).encode(hash)
+    multibase::Base::Base64Url.encode(hash)
   }
 }
 

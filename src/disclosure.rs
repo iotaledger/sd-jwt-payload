@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::Error;
 use serde_json::Value;
 
@@ -22,11 +24,11 @@ impl Disclosure {
   ///
   /// Use `.to_string()` to get the actual disclosure.
   pub fn new(salt: String, claim_name: Option<String>, claim_value: Value) -> Self {
-    let result = match claim_name {
+    match claim_name {
       Some(name) => {
         let input: String = format!("[\"{}\", \"{}\", {}]", &salt, &name, &claim_value.to_string());
         // let encoded = encode_b64(&input);
-        let encoded = multibase::Base::from(multibase::Base::Base64).encode(&input);
+        let encoded = multibase::Base::Base64.encode(input);
         Self {
           salt,
           claim_name: Some(name),
@@ -37,7 +39,7 @@ impl Disclosure {
       None => {
         let input: String = format!("[\"{}\", {}]", &salt, &claim_value.to_string());
         // let encoded = encode_b64(&input);
-        let encoded = multibase::Base::from(multibase::Base::Base64).encode(&input);
+        let encoded = multibase::Base::Base64.encode(input);
         Self {
           salt,
           claim_name: None,
@@ -45,8 +47,7 @@ impl Disclosure {
           disclosure: encoded,
         }
       }
-    };
-    result
+    }
   }
 
   /// Parses a Base64 encoded disclosure into a [`Disclosure`].
@@ -55,7 +56,7 @@ impl Disclosure {
   ///
   /// Returns an [`Error::InvalidDisclosure`] if input is not a valid disclosure.
   pub fn parse(disclosure: String) -> Result<Self, Error> {
-    let decoded: Vec<Value> = multibase::Base::from(multibase::Base::Base64Url)
+    let decoded: Vec<Value> = multibase::Base::Base64Url
       .decode(&disclosure)
       .map_err(|_e| {
         Error::InvalidDisclosure(format!(
@@ -124,11 +125,6 @@ impl Disclosure {
     }
   }
 
-  /// Get the actual disclosure.
-  pub fn to_string(&self) -> String {
-    self.disclosure.clone()
-  }
-
   /// Reference the actual disclosure.
   pub fn as_str(&self) -> &str {
     &self.disclosure
@@ -137,6 +133,12 @@ impl Disclosure {
   /// Convert this object into the actual disclosure.
   pub fn into_string(self) -> String {
     self.disclosure
+  }
+}
+
+impl Display for Disclosure {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(&self.disclosure)
   }
 }
 

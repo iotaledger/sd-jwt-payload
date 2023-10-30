@@ -163,7 +163,7 @@ Create SD-JWT
 
 ```rust
   let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
-  let sd_jwt: String = sd_jwt.to_string();
+  let sd_jwt: String = sd_jwt.presentation();
 ```
 
 ```

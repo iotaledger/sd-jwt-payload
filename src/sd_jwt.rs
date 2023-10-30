@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{Error, Result};
 use itertools::Itertools;
 
@@ -27,7 +29,21 @@ impl SdJwt {
   ///
   /// ## Error
   /// Returns [`Error::DeserializationError`] if parsing fails.
-  pub fn to_string(self) -> String {
+  pub fn presentation(&self) -> String {
+    let disclosures = self.disclosures.iter().cloned().join("~");
+    let key_bindings: String = if let Some(key_bindings) = &self.key_binding_jwt {
+      key_bindings.clone()
+    } else {
+      "".to_owned()
+    };
+    format!("{}~{}~{}", self.jwt, disclosures, key_bindings)
+  }
+
+  /// Serializes the components into the final SD-JWT.
+  ///
+  /// ## Error
+  /// Returns [`Error::DeserializationError`] if parsing fails.
+  pub fn into_presentation(self) -> String {
     let disclosures = self.disclosures.into_iter().join("~");
     let key_bindings: String = if let Some(key_bindings) = self.key_binding_jwt {
       key_bindings
@@ -47,16 +63,16 @@ impl SdJwt {
       ));
     }
 
-    let includes_key_binding = sd_jwt.chars().rev().next().map(|char| char != '~').unwrap_or(false);
+    let includes_key_binding = sd_jwt.chars().next_back().map(|char| char != '~').unwrap_or(false);
     if includes_key_binding && num_of_segments < 3 {
       return Err(Error::DeserializationError(
         "SD-JWT format is invalid, less than 3 segments with key binding jwt".to_string(),
       ));
     }
 
-    let jwt = sd_segments.get(0).unwrap().to_string();
+    let jwt = sd_segments.first().unwrap().to_string();
     let disclosures: Vec<String> = sd_segments[1..num_of_segments - 1]
-      .into_iter()
+      .iter()
       .map(|disclosure| disclosure.to_string())
       .collect();
 
@@ -67,6 +83,12 @@ impl SdJwt {
       disclosures,
       key_binding_jwt: key_binding,
     })
+  }
+}
+
+impl Display for SdJwt {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(&(self.presentation()))
   }
 }
 
