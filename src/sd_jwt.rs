@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use crate::{Error, Result};
+use crate::Error;
+use crate::Result;
 use itertools::Itertools;
 
 /// Representation of an SD-JWT of the format

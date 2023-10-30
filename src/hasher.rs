@@ -1,4 +1,5 @@
-use crypto::hashes::sha::{SHA256, SHA256_LEN};
+use crypto::hashes::sha::SHA256;
+use crypto::hashes::sha::SHA256_LEN;
 
 /// Used to implement hash functions to be used for encoding/decoding.
 pub trait Hasher: Sync + Send {

@@ -1,9 +1,14 @@
-use super::{Disclosure, Hasher, Sha256Hasher};
+use super::Disclosure;
+use super::Hasher;
+use super::Sha256Hasher;
 use crate::Error;
 use crate::Result;
 use crate::Utils;
-use rand::{distributions::DistString, Rng};
-use serde_json::{json, Map, Value};
+use rand::distributions::DistString;
+use rand::Rng;
+use serde_json::json;
+use serde_json::Map;
+use serde_json::Value;
 
 pub(crate) const DIGESTS_KEY: &str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";

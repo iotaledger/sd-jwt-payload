@@ -14,5 +14,7 @@ pub use encoder::*;
 pub use error::*;
 pub use hasher::*;
 pub use sd_jwt::*;
-pub use serde_json::{json, Map, Value};
+pub use serde_json::json;
+pub use serde_json::Map;
+pub use serde_json::Value;
 pub(crate) use utils::*;

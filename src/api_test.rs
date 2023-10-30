@@ -1,10 +1,14 @@
-use josekit::{
-  jws::{JwsHeader, HS256},
-  jwt::{self, JwtPayload},
-};
-use serde_json::{json, Value};
+use josekit::jws::JwsHeader;
+use josekit::jws::HS256;
+use josekit::jwt::JwtPayload;
+use josekit::jwt::{self};
+use serde_json::json;
+use serde_json::Value;
 
-use crate::{Disclosure, SdJwt, SdObjectDecoder, SdObjectEncoder};
+use crate::Disclosure;
+use crate::SdJwt;
+use crate::SdObjectDecoder;
+use crate::SdObjectEncoder;
 
 #[test]
 fn test_complex_structure() {

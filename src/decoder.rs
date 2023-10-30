@@ -1,8 +1,13 @@
-use crate::{Utils, ARRAY_DIGEST_KEY, DIGESTS_KEY};
+use crate::Utils;
+use crate::ARRAY_DIGEST_KEY;
+use crate::DIGESTS_KEY;
 
-use super::{Disclosure, Hasher, Sha256Hasher};
+use super::Disclosure;
+use super::Hasher;
+use super::Sha256Hasher;
 use crate::Error;
-use serde_json::{Map, Value};
+use serde_json::Map;
+use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// Substitutes digests in an SD-JWT object by their corresponding plaintext values provided by disclosures.
@@ -233,8 +238,10 @@ impl Default for SdObjectDecoder {
 #[cfg(test)]
 mod test {
   use crate::Error;
-  use crate::{SdObjectDecoder, SdObjectEncoder};
-  use serde_json::{json, Value};
+  use crate::SdObjectDecoder;
+  use crate::SdObjectEncoder;
+  use serde_json::json;
+  use serde_json::Value;
 
   #[test]
   fn collision() {
