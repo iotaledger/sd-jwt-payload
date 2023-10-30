@@ -94,7 +94,7 @@ This creates a stateful encoder with `Sha-256` hash function by default to creat
 
 *Note: `SdObjectEncoder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-The encoder can encode any of the object's values or any array element, using the `conceal` and `conceal_array_entry` methods respectively. Suppose the value of `region` should be selectively disclosed as well as the value of `address` and the first `phone` value.
+The encoder can encode any of the object's values or any array element, using the `conceal` and `conceal_array_entry` methods respectively. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
 
 ```rust
   let disclosure1 = encoder.conceal(&["address", "street_address"], None).unwrap();
@@ -107,7 +107,7 @@ The encoder can encode any of the object's values or any array element, using th
 "WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0"
 "WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd"
 ```
-The encoder also supports adding decoys. Suppose the amount of phone numbers and the amount of claims needs to be hidden.
+The encoder also supports adding decoys. For instance, the amount of phone numbers and the amount of claims need to be hidden.
 
 ```rust
   encoder.add_decoys(&["phone"], 3).unwrap(); //Adds 3 decoys to the array `phone`.
@@ -116,7 +116,7 @@ The encoder also supports adding decoys. Suppose the amount of phone numbers and
 
 Add the hash function claim.
 ```rust
-  encoder.add_sd_alg_property();
+  encoder.add_sd_alg_property(); // This adds "_sd_alg": "sha-256"
 ```
 
 Now `encoder.object()` will return the encoded object.
@@ -153,11 +153,13 @@ Now `encoder.object()` will return the encoded object.
 }
 ```
 
-*Note: no JWT values like `exp` or `iat` are added. If necessary, these need to be added and validated manually.*
+*Note: no JWT claims like `exp` or `iat` are added. If necessary, these need to be added and validated manually.*
 
 ### Creating SD-JWT
 
 Since creating JWTs is outside the scope of this library, see [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create `jwt` with the object above as the claim set.
+
+Create SD-JWT
 
 ```rust
   let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
