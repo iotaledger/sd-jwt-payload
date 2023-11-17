@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use super::Disclosure;
 use super::Hasher;
 use super::Sha256Hasher;
@@ -12,6 +14,7 @@ use serde_json::Value;
 
 pub(crate) const DIGESTS_KEY: &str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
+pub(crate) const DEFAULT_SALT_RANGE: Range<usize> = 24..34;
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
@@ -33,7 +36,7 @@ impl SdObjectEncoder {
   pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
     Ok(SdObjectEncoder {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: rand::thread_rng().gen_range(24..34),
+      salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
       hasher: Sha256Hasher::new(),
     })
   }
@@ -46,7 +49,7 @@ impl TryFrom<Value> for SdObjectEncoder {
     match value {
       Value::Object(object) => Ok(SdObjectEncoder {
         object,
-        salt_length: rand::thread_rng().gen_range(24..34),
+        salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
         hasher: Sha256Hasher::new(),
       }),
       _ => Err(Error::DataTypeMismatch("Expected object".to_owned())),
@@ -59,7 +62,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   pub fn with_custom_hasher(json: &str, hasher: H) -> Result<Self> {
     Ok(Self {
       object: serde_json::from_str(json).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: rand::thread_rng().gen_range(24..34),
+      salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
       hasher,
     })
   }
@@ -185,7 +188,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Returns the modified object as a string.
-  pub fn to_string(&self) -> Result<String> {
+  pub fn try_to_string(&self) -> Result<String> {
     serde_json::to_string(&self.object)
       .map_err(|_e| Error::Unspecified("error while serializing internal object".to_string()))
   }
@@ -220,30 +223,28 @@ impl<H: Hasher> SdObjectEncoder<H> {
         let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});
         array.push(tripledot);
-        return Ok(disclosure);
+        Ok(disclosure)
       } else {
-        return Err(Error::InvalidPath(format!(
-          "{} is neiter an object nor an array",
+        Err(Error::InvalidPath(format!(
+          "{} is neither an object nor an array",
           target_key
-        )));
+        )))
       }
     }
   }
 
   fn add_digest_to_object(object: &mut Map<String, Value>, digest: String) -> Result<()> {
     // Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
-    match object.get_mut(DIGESTS_KEY) {
-      Some(sd_value) => match sd_value {
-        Value::Array(value) => value.push(Value::String(digest)),
-        _ => {
-          return Err(Error::DataTypeMismatch(
-            "invalid object: existing `_sd` type is not an array".to_string(),
-          ))
-        }
-      },
-      None => {
-        object.insert(DIGESTS_KEY.to_owned(), Value::Array(vec![Value::String(digest)]));
+    if let Some(sd_value) = object.get_mut(DIGESTS_KEY) {
+      if let Value::Array(value) = sd_value {
+        value.push(Value::String(digest))
+      } else {
+        return Err(Error::DataTypeMismatch(
+          "invalid object: existing `_sd` type is not an array".to_string(),
+        ));
       }
+    } else {
+      object.insert(DIGESTS_KEY.to_owned(), Value::Array(vec![Value::String(digest)]));
     }
     Ok(())
   }

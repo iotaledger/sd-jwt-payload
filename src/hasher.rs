@@ -14,7 +14,7 @@ pub trait Hasher: Sync + Send {
 pub struct Sha256Hasher;
 
 impl Sha256Hasher {
-  pub const ALG_NAME: &str = "sha-256";
+  pub const ALG_NAME: &'static str = "sha-256";
   /// Creates a new [`ShaHasher`]
   pub fn new() -> Self {
     Sha256Hasher {}

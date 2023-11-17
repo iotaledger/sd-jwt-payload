@@ -24,29 +24,18 @@ impl Disclosure {
   ///
   /// Use `.to_string()` to get the actual disclosure.
   pub fn new(salt: String, claim_name: Option<String>, claim_value: Value) -> Self {
-    match claim_name {
-      Some(name) => {
-        let input: String = format!("[\"{}\", \"{}\", {}]", &salt, &name, &claim_value.to_string());
-        // let encoded = encode_b64(&input);
-        let encoded = multibase::Base::Base64.encode(input);
-        Self {
-          salt,
-          claim_name: Some(name),
-          claim_value,
-          disclosure: encoded,
-        }
-      }
-      None => {
-        let input: String = format!("[\"{}\", {}]", &salt, &claim_value.to_string());
-        // let encoded = encode_b64(&input);
-        let encoded = multibase::Base::Base64.encode(input);
-        Self {
-          salt,
-          claim_name: None,
-          claim_value,
-          disclosure: encoded,
-        }
-      }
+    let input = if let Some(name) = &claim_name {
+      format!("[\"{}\", \"{}\", {}]", &salt, &name, &claim_value.to_string())
+    } else {
+      format!("[\"{}\", {}]", &salt, &claim_value.to_string())
+    };
+
+    let encoded = multibase::Base::Base64.encode(input);
+    Self {
+      salt,
+      claim_name,
+      claim_value,
+      disclosure: encoded,
     }
   }
 
