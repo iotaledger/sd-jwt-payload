@@ -14,6 +14,7 @@ thiserror = { version = "1.0", default-features = false }
 strum = { version = "0.25", default-features = false, features = ["std", "derive"] }
 itertools = { version = "0.11", default-features = false, features = ["use_std"]  }
 iota-crypto = { version = "0.23", default-features = false, features = ["std", "sha"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 josekit = "0.8.4"
