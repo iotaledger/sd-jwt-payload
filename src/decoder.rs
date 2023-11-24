@@ -83,7 +83,7 @@ impl SdObjectDecoder {
     Ok(decoded)
   }
 
-  fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
+  pub fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
     //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
     let alg: &str = if let Some(alg) = object.get("_sd_alg") {
       alg
