@@ -1,6 +1,6 @@
 use crate::Hasher;
 
-pub(crate) struct Utils {}
+pub struct Utils {}
 
 impl Utils {
   pub fn digest_b64_url_only_ascii(hasher: &dyn Hasher, input: &str) -> String {

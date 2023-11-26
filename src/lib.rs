@@ -19,4 +19,4 @@ pub use sd_jwt::*;
 pub use serde_json::json;
 pub use serde_json::Map;
 pub use serde_json::Value;
-pub(crate) use utils::*;
+pub use utils::*;
