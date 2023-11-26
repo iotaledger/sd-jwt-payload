@@ -3,7 +3,7 @@ use crate::Hasher;
 pub(crate) struct Utils {}
 
 impl Utils {
-  pub(crate) fn digest_b64_url_only_ascii(hasher: &dyn Hasher, input: &str) -> String {
+  pub fn digest_b64_url_only_ascii(hasher: &dyn Hasher, input: &str) -> String {
     // "The digest MUST be taken over the US-ASCII bytes of the base64url-encoded Disclosure".
     let ascii_bytes: Vec<u8> = input.as_bytes().iter().cloned().filter(|&byte| byte <= 127).collect();
     let hash = hasher.digest(&ascii_bytes);
