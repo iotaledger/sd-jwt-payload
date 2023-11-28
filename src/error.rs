@@ -1,3 +1,6 @@
+// Copyright 2020-2023 IOTA Stiftung
+// SPDX-License-Identifier: Apache-2.0
+
 /// Alias for a `Result` with the error type [`Error`].
 pub type Result<T> = ::core::result::Result<T, Error>;
 
