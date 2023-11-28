@@ -20,12 +20,12 @@ pub(crate) const DEFAULT_SALT_RANGE: Range<usize> = 24..34;
 /// with their corresponding disclosure digests.
 pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   /// The object in JSON format.
-  pub object: Map<String, Value>,
+  object: Map<String, Value>,
   /// Length of the salts that generated for disclosures.
   /// Constant length for readability considerations.
-  pub salt_length: usize,
+  salt_length: usize,
   /// The hash function used to create digests.
-  pub hasher: H,
+  hasher: H,
 }
 
 impl SdObjectEncoder {
@@ -270,8 +270,29 @@ impl<H: Hasher> SdObjectEncoder<H> {
     rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), len)
   }
 
+  /// Returns a reference to the internal object.
   pub fn object(&self) -> &Map<String, Value> {
     &self.object
+  }
+
+  /// Returns a mutable reference to the internal object.
+  pub fn object_mut(&mut self) -> &mut Map<String, Value> {
+    &mut self.object
+  }
+
+  /// Returns the used salt length.
+  pub fn salt_length(&self) -> usize {
+    self.salt_length
+  }
+
+  /// Sets the used salt length.
+  ///
+  /// ## Warning
+  /// If the new value is 0, it will not be set.
+  pub fn set_salt_length(&mut self, salt_length: usize) {
+    if salt_length > 0 {
+      self.salt_length = salt_length
+    }
   }
 }
 
