@@ -111,7 +111,7 @@ fn test_complex_structure() {
   let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &verifier).unwrap();
 
   // Decode the payload by providing the disclosures that were parsed from the SD-JWT.
-  let decoder = SdObjectDecoder::new_with_sha256_hasher();
+  let decoder = SdObjectDecoder::new();
   let decoded = decoder.decode(payload.claims_set(), &sd_jwt.disclosures).unwrap();
   println!("decoded object: {}", serde_json::to_string_pretty(&decoded).unwrap());
   assert_eq!(Value::Object(decoded), object);
@@ -152,7 +152,7 @@ fn concealed_object_in_array() {
     .into_iter()
     .map(|disclosure| disclosure.to_string())
     .collect();
-  let decoder = SdObjectDecoder::new_with_sha256_hasher();
+  let decoder = SdObjectDecoder::new();
   let decoded = decoder.decode(encoder.object(), &disclosures).unwrap();
   assert_eq!(Value::Object(decoded), expected);
 }

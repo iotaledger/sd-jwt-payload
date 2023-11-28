@@ -16,16 +16,10 @@ pub struct SdObjectDecoder {
 }
 
 impl SdObjectDecoder {
-  /// Creates a new [`SdObjectDecoder`] without any hashers.
-  /// If `sha-256` decoder is needed, consider using `new_with_sha256_hasher()` instead.
+  /// Creates a new [`SdObjectDecoder`] with `sha-256` hasher.
   pub fn new() -> Self {
     let hashers: BTreeMap<String, Box<dyn Hasher>> = BTreeMap::new();
-    Self { hashers }
-  }
-
-  /// Creates a new [`SdObjectDecoder`] with `sha-256` hasher.
-  pub fn new_with_sha256_hasher() -> Self {
-    let mut hasher = Self::new();
+    let mut hasher = Self { hashers };
     hasher.add_hasher(Box::new(Sha256Hasher::new()));
     hasher
   }
@@ -253,7 +247,7 @@ mod test {
     encoder
       .object_mut()
       .insert("id".to_string(), Value::String("id-value".to_string()));
-    let decoder = SdObjectDecoder::new_with_sha256_hasher();
+    let decoder = SdObjectDecoder::new();
     let decoded = decoder.decode(encoder.object(), &vec![dis.to_string()]).unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
@@ -269,7 +263,7 @@ mod test {
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
     assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
-    let decoder = SdObjectDecoder::new_with_sha256_hasher();
+    let decoder = SdObjectDecoder::new();
     let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }
