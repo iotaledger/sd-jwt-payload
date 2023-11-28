@@ -4,7 +4,8 @@ use std::time::SystemTime;
 use itertools::Itertools;
 use serde_json::Value;
 
-use crate::{utils::Utils, Hasher};
+use crate::utils::Utils;
+use crate::Hasher;
 use serde::Deserialize;
 use serde::Serialize;
 
