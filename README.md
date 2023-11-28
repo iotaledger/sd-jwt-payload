@@ -18,160 +18,191 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
+<!-- [![Contributors][contributors-shield]][contributors-url] -->
+<!-- [![Forks][forks-shield]][forks-url] -->
+<!-- [![Stargazers][stars-shield]][stars-url] -->
+<!-- [![Issues][issues-shield]][issues-url] -->
 [![Apache 2.0 license][license-shield]][license-url]
 [![Discord][discord-shield]][discord-url]
 [![StackExchange][stackexchange-shield]][stackexchange-url]
 <!-- Add additional Badges. Some examples >
 ![Format Badge](https://github.com/iotaledger/template/workflows/Format/badge.svg "Format Badge")
 ![Audit Badge](https://github.com/iotaledger/template/workflows/Audit/badge.svg "Audit Badge")
-![Clippy Badge](https://github.com/iotaledger/template/workflows/Clippy/badge.svg "Clippy Badge")
 ![BuildBadge](https://github.com/iotaledger/template/workflows/Build/badge.svg "Build Badge")
 ![Test Badge](https://github.com/iotaledger/template/workflows/Test/badge.svg "Test Badge")
 ![Coverage Badge](https://coveralls.io/repos/github/iotaledger/template/badge.svg "Coverage Badge")
 
-
-<!-- PROJECT LOGO -->
-<br />
-<div align="center">
-    <a href="https://github.com/iotaledger/template">
-        <img src="banner.png" alt="Banner">
-    </a>
-    <h3 align="center">project_title</h3>
-    <p align="center">
-        project_description
-        <br />
-        <a href="https://wiki.iota.org"><strong>Explore the docs »</strong></a>
-        <br />
-        <br />
-        <a href="https://github.com/iotaledger/template/labels/bug">Report Bug</a>
-        ·
-        <a href="https://github.com/iotaledger/template/labels/request">Request Feature</a>
-    </p>
-</div>
-
-
-
-<!-- TABLE OF CONTENTS -->
-<!-- TODO 
-Edit the ToC to your needs. If your project is part of the wiki, you should link directly to the Wiki where possible and remove unneeded sections to prevent duplicates 
--->
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
-  </ol>
-</details>
-
-
-
 <!-- ABOUT THE PROJECT -->
-## About The Project
 
-1. Here's a blank template to get started: To avoid retyping too much info. Do a search and replace with your text editor for the following: `iotaledger`, `template`, `twitter_handle`, `email_client`, `email`, `project_title`, `project_description`, `TODO`.
-2. Edit the README to suit your needs by in it following the instructions here.
-3. Replace the `banner.png` with your own banner or remove it.
-4. Edit the issue and pull request templates if required. Keep in mind that the issue forms in this template add a `bug`/`request` label to the issues. Make sure they exist.
+# SD-JWT Reference implementation
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 06**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html)
 
+## Overview
 
-<!-- TODO
-This section should list any major frameworks/libraries used to bootstrap your project. Leave any add-ons/plugins for the acknowledgements section. Here are a few examples:
--->
-### Built With
+This library supports 
+* **Encoding**:
+  - creating disclosers and replacing values in objects and arrays with the digest of their disclosure. 
+  - Adding decoys to objects and arrays.
+* **Decoding**  
+  - Recursively replace digests in objects and arrays with their corresponding disclosure value.
 
-* [Next.js](https://nextjs.org/)
-* [React.js](https://reactjs.org/)
-* [Vue.js](https://vuejs.org/)
-* [Angular](https://angular.io/)
-* [Svelte](https://svelte.dev/)
-* [Laravel](https://laravel.com)
-* [Bootstrap](https://getbootstrap.com)
-* [JQuery](https://jquery.com)
+`Sha-256` hash function is shipped by default, encoding/decoding with other hash functions is possible. 
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+## Getting started
+ToDo
 
+## Examples
 
+See [sd_jwt.rs](./examples/sd_jwt.rs) for a runnable example.
 
-<!-- GETTING STARTED -->
-## Getting Started
-
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
-
-### Prerequisites
-
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
-
-### Installation
-
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/iotaledger/template.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+This library consists of the major structs:
+1. [`SdObjectEncoder`](./src/encoder.rs): creates SD objects.
+2. [`SdObjectDecoder`](./src/decoder.rs): decodes SD objects.
+3. [`Disclosure`](./src/disclosure.rs): used by the `SdObjectEncoder` and `SdObjectDecoder` to represent a disclosure.
+3. [`SdJwt`](./src/sd_jwt.rs): creates/parses SD-JWTs.
+4. [`Hasher`](./src/hasher.rs): a trait to provide hash functions to the encoder/decoder.
+5. [`Sha256Hasher`](./src/hasher.rs): implements `Hasher` for the `Sha-256` hash function.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+### Encoding
+Any JSON object can be encoded
 
 
+```rust
+  let object = json!({
+    "given_name": "John",
+    "family_name": "Doe",
+    "address": {
+      "street_address": "123 Main St",
+      "region": "Anystate",
+    },
+    "phone": [
+      "+49 123456",
+      "+49 234567"
+    ]
+  });
+```
 
-<!-- ROADMAP -->
-## Roadmap
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
+```rust
+  let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+```
+This creates a stateful encoder with `Sha-256` hash function by default to create disclosure digests. 
 
-See the [open issues](https://github.com/iotaledger/template/issues) for a full list of proposed features (and known issues).
+*Note: `SdObjectEncoder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+The encoder can encode any of the object's values or any array element, using the `conceal` and `conceal_array_entry` methods respectively. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
 
+```rust
+  let disclosure1 = encoder.conceal(&["address", "street_address"], None).unwrap();
+  let disclosure2 = encoder.conceal(&["address"], None).unwrap();
+  let disclosure3 = encoder.conceal_array_entry(&["phone"], 0, None).unwrap();
+```
+
+```
+"WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ"
+"WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0"
+"WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd"
+```
+The encoder also supports adding decoys. For instance, the amount of phone numbers and the amount of claims need to be hidden.
+
+```rust
+  encoder.add_decoys(&["phone"], 3).unwrap(); //Adds 3 decoys to the array `phone`.
+  encoder.add_decoys(&[], 6).unwrap(); // Adds 6 decoys to the top level object.
+```
+
+Add the hash function claim.
+```rust
+  encoder.add_sd_alg_property(); // This adds "_sd_alg": "sha-256"
+```
+
+Now `encoder.object()` will return the encoded object.
+
+```json
+{
+  "given_name": "John",
+  "family_name": "Doe",
+  "phone": [
+    {
+      "...": "eZVn0KkQm_T8x-x57VxYt-_MmNG91Sh34E-bZEnNfWY"
+    },
+    "+49 234567",
+    {
+      "...": "KAiJIx0tktQRXBxZSBVVld9298bZIp2WkpkDYDa3CWQ"
+    },
+    {
+      "...": "CBKARPh6sdTCJyliZ7pBOYzix7Z4Bb4yRh0EykHX2Uw"
+    },
+    {
+      "...": "oi1KgsYXgqBFXUXvbVaHSGYYaWhkB5RL55T90Gl_5s0"
+    }
+  ],
+  "_sd": [
+    "Jj5jBeGEawY6vRvmHDg55EjeAIP8FVhWEV2FczhUXrY",
+    "8eqphBPJyCBgUJhNWNP7ci-Y79N615wpZQrxi5D4ju8",
+    "_hOU5puJjNzSBhK0bwh3h8_b6H6nN7vd_7I0uTp80Mo",
+    "G_tH70MrfCkVM0HhsH9REObIt1Ei19477y6CEsS0Zlo",
+    "zP56MeH0ryjzqh9Kadrb5C9Z2BE2FWg8nb3g0rR3LSA",
+    "dgfVW11ip9OOyVi8M4h1RjXK8akw7ICeMQkjUwSI6iU",
+    "Bx33mOyTF5-w8gRS5yL4YQ4dig44V3lmHxk1WRss_7U"
+  ],
+  "_sd_alg": "sha-256"
+}
+```
+
+*Note: no JWT claims like `exp` or `iat` are added. If necessary, these need to be added and validated manually.*
+
+### Creating SD-JWT
+
+Since creating JWTs is outside the scope of this library, see [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create `jwt` with the object above as the claim set.
+
+Create SD-JWT
+
+```rust
+  let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
+  let sd_jwt: String = sd_jwt.presentation();
+```
+
+```
+eyJ0eXAiOiJTRC1KV1QiLCJhbGciOiJIUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwicGhvbmUiOlt7Ii4uLiI6ImVaVm4wS2tRbV9UOHgteDU3VnhZdC1fTW1ORzkxU2gzNEUtYlpFbk5mV1kifSwiKzQ5IDIzNDU2NyIseyIuLi4iOiJLQWlKSXgwdGt0UVJYQnhaU0JWVmxkOTI5OGJaSXAyV2twa0RZRGEzQ1dRIn0seyIuLi4iOiJDQktBUlBoNnNkVENKeWxpWjdwQk9Zeml4N1o0QmI0eVJoMEV5a0hYMlV3In0seyIuLi4iOiJvaTFLZ3NZWGdxQkZYVVh2YlZhSFNHWVlhV2hrQjVSTDU1VDkwR2xfNXMwIn1dLCJfc2QiOlsiSmo1akJlR0Vhd1k2dlJ2bUhEZzU1RWplQUlQOEZWaFdFVjJGY3poVVhyWSIsIjhlcXBoQlBKeUNCZ1VKaE5XTlA3Y2ktWTc5TjYxNXdwWlFyeGk1RDRqdTgiLCJfaE9VNXB1SmpOelNCaEswYndoM2g4X2I2SDZuTjd2ZF83STB1VHA4ME1vIiwiR190SDcwTXJmQ2tWTTBIaHNIOVJFT2JJdDFFaTE5NDc3eTZDRXNTMFpsbyIsInpQNTZNZUgwcnlqenFoOUthZHJiNUM5WjJCRTJGV2c4bmIzZzByUjNMU0EiLCJkZ2ZWVzExaXA5T095Vmk4TTRoMVJqWEs4YWt3N0lDZU1Ra2pVd1NJNmlVIiwiQngzM21PeVRGNS13OGdSUzV5TDRZUTRkaWc0NFYzbG1IeGsxV1Jzc183VSJdLCJfc2RfYWxnIjoic2hhLTI1NiJ9.knTqw4FMCplHoMu7mfiix7dv4lIjYgRIn-tmuemAhbY~WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ~WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0~WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd~
+```
+
+### Decoding
+
+Parse the SD-JWT string to extract the JWT and the disclosures in order to decode the claims and construct the disclosed values.
+
+*Note: Validating the signature of the JWT and extracting the claim set is outside the scope of this library.
+
+```rust
+  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string).unwrap();
+  let claims_set: // extract claims from `sd_jwt.jwt`.
+  let decoder = SdObjectDecoder::new_with_sha256_hasher();
+  let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures).unwrap();
+```
+`decoded_object`:
+
+```json
+{
+  "given_name": "John",
+  "family_name": "Doe",
+  "phone": [
+    "+49 123456",
+    "+49 234567"
+  ],
+  "address": {
+    "region": "Anystate",
+    "street_address": "123 Main St"
+  }
+}
+
+```
+
+Note:
+* `street_address` and `address` are recursively decoded.
+* `_sd_alg` property was removed.
 
 
 <!-- CONTRIBUTING -->
@@ -190,37 +221,12 @@ Don't forget to give the project a star! Thanks again!
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
-
 <!-- LICENSE -->
 ## License
 
 Distributed under the Apache License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- CONTACT -->
-## Contact
-
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/iotaledger/template](https://github.com/iotaledger/template)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
@@ -234,7 +240,7 @@ Project Link: [https://github.com/iotaledger/template](https://github.com/iotale
 [issues-shield]: https://img.shields.io/github/issues/iotaledger/template.svg?style=for-the-badge
 [issues-url]: https://github.com/iotaledger/template/issues
 [license-shield]: https://img.shields.io/github/license/iotaledger/template.svg?style=for-the-badge
-[license-url]: https://github.com/iotaledger/template/blob/main/LICENSE
+[license-url]: https://github.com/iotaledger/sd-jwt/blob/main/LICENSE
 [discord-shield]: https://img.shields.io/badge/Discord-9cf.svg?style=for-the-badge&logo=discord
 [discord-url]: https://discord.iota.org
 [stackexchange-shield]: https://img.shields.io/badge/StackExchange-9cf.svg?style=for-the-badge&logo=stackexchange

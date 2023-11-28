@@ -1,0 +1,24 @@
+[package]
+name = "sd-jwt"
+version = "0.1.0"
+edition = "2021"
+authors = ["IOTA Stiftung"]
+homepage = "https://www.iota.org"
+license = "Apache-2.0"
+
+[dependencies]
+multibase = { version = "0.9", default-features = false, features = ["std"] }
+serde_json = { version = "1.0", default-features = false, features = ["std" ] }
+rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
+thiserror = { version = "1.0", default-features = false }
+strum = { version = "0.25", default-features = false, features = ["std", "derive"] }
+itertools = { version = "0.11", default-features = false, features = ["use_std"]  }
+iota-crypto = { version = "0.23", default-features = false, features = ["std", "sha"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+josekit = "0.8.4"
+
+[[example]]
+name = "sd_jwt"
+
