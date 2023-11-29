@@ -179,7 +179,7 @@ Parse the SD-JWT string to extract the JWT and the disclosures in order to decod
 ```rust
   let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string).unwrap();
   let claims_set: // extract claims from `sd_jwt.jwt`.
-  let decoder = SdObjectDecoder::new_with_sha256_hasher();
+  let decoder = SdObjectDecoder::new();
   let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures).unwrap();
 ```
 `decoded_object`:
