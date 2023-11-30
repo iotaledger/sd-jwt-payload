@@ -1,0 +1,45 @@
+name: Build and run tests Windows
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [ opened, synchronize, reopened, ready_for_review ]
+    branches:
+      - main
+      - 'epic/**'
+      - 'support/**'
+    paths:
+      - '.github/workflows/build-and-test.yml'
+      - '.github/actions/**'
+      - '**.rs'
+      - '**.toml'
+
+env:
+  RUST_BACKTRACE: full
+
+jobs:
+  check-for-run-condition:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ !github.event.pull_request || github.event.pull_request.draft == false }}
+    steps:
+      - run: |
+          # this run step does nothing, but is needed to get the job output
+
+  build-and-test:
+    runs-on: windows-latest
+    needs: [ check-for-run-condition ]
+    if: ${{ needs.check-for-run-condition.outputs.should-run == 'true' }}
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust 
+        uses: './.github/actions/rust/rust-setup'
+
+      - name: Build
+        run: cargo build --workspace --all-features --release
