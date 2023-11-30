@@ -18,6 +18,7 @@ use serde_json::Value;
 pub(crate) const DIGESTS_KEY: &str = "_sd";
 
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
+
 pub(crate) const DEFAULT_SALT_RANGE: Range<usize> = 24..34;
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
