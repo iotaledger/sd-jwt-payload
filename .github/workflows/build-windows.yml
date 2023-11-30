@@ -1,4 +1,4 @@
-name: Build and run tests Windows
+name: Build on Windows
 
 on:
   push:
