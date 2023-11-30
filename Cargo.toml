@@ -7,6 +7,9 @@ homepage = "https://www.iota.org"
 license = "Apache-2.0"
 repository = "https://github.com/iotaledger/sd-jwt"
 rust-version = "1.65"
+readme = "./README.md"
+description = "Rust implementation of the Selective Disclosure for JWTs (SD-JWT)"
+keywords = ["sd-jwt", "selective-disclosure", "disclosure"]
 
 [dependencies]
 multibase = { version = "0.9", default-features = false, features = ["std"] }

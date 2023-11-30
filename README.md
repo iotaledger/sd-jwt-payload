@@ -53,9 +53,10 @@ This library supports
 Include the library in your `cargo.toml`.
 
 ```bash
-[dependencies]
-sd-jwt = { version = "0.1.0" }
+//todo
 ```
+<!-- [dependencies] -->
+<!-- sd-jwt = { version = "0.1.0" } -->
 
 ## Examples
 
