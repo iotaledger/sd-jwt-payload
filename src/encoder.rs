@@ -15,7 +15,7 @@ use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
 
-pub(crate) const DIGESTS_KEY: &str = "_sd";
+pub(crate) const DIGESTS_KEY: str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 pub(crate) const DEFAULT_SALT_RANGE: Range<usize> = 24..34;
 
