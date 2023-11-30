@@ -50,7 +50,12 @@ This library supports
 `Sha-256` hash function is shipped by default, encoding/decoding with other hash functions is possible. 
 
 ## Getting started
-ToDo
+Include the library in your `cargo.toml`.
+
+```bash
+[dependencies]
+sd-jwt = { version = "0.1.0" }
+```
 
 ## Examples
 
