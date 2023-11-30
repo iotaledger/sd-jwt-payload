@@ -1,0 +1,58 @@
+name: 'rust-setup'
+description: 'Prepares a rust environment and relevant caches.'
+inputs:
+  target:
+    description: 'Additionally install specified target for this toolchain, ex. x86_64-apple-darwin'
+    required: false
+  toolchain:
+    description: 'Toolchain to install. Default: stable.'
+    required: false
+    default: stable
+  components:
+    description: 'Comma-separated string of additional components to install e.g. `clippy`, `rustfmt`'
+    required: false
+runs:
+  using: "composite"
+  steps:
+
+    - name: Get current date
+      shell: bash
+      run: echo "CURRENT_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+    - name: Setup rust toolchain
+      shell: bash
+      run: |
+
+        if ! rustup self update; then
+            echo "rustup self update failed"
+        fi
+        
+        TARGET=${{ inputs.target }}
+        if [[ $TARGET != '' ]]; then
+          rustup target add $TARGET
+        fi
+
+        rustup update
+        
+        TOOLCHAIN=${{ inputs.toolchain }}
+        if [[ $TOOLCHAIN != 'stable' ]]; then
+           rustup toolchain install $TOOLCHAIN
+        fi
+
+        COMPONENTS=${{ inputs.components }}
+        if [[ $COMPONENTS != '' ]]; then
+          for i in ${COMPONENTS//,/ }
+          do
+            rustup component add $i $(if [ $TOOLCHAIN != '' ]; then echo --toolchain $TOOLCHAIN; fi)
+          done
+        fi
+        
+        rustup show
+
+    # Generate Cargo.lock files for build, sccache cache keys.
+    # Allows dependencies updated on crates.io between runs to trigger storing an updated cache,
+    # which hashing Cargo.toml files alone does not.
+    - name: Cargo update
+      run: cargo update
+      shell: bash
+
