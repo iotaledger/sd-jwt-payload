@@ -1,0 +1,31 @@
+name: 'publish-rust'
+description: 'Publishes Rust library to crates.io'
+inputs:
+  crates-token:
+    description: 'used for authenticating towards crates.io'
+    required: true
+  version:
+    description: 'the version to release under (e.g. `1.2.3-dev.1`)'
+    required: true
+  dry-run:
+    description: "'true' = only log potential result; 'false' = publish'"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Rust
+      uses: './.github/actions/rust/rust-setup'
+      with:
+        os: ${{ runner.os }}
+        job: ${{ github.job }}
+
+    - name: Install cargo-release
+      shell: bash
+      run: cargo install cargo-release
+
+    - name: Publish library to crates.io
+      shell: bash
+      run: |
+        echo "dry-run: '${{ inputs.dry-run }}'"
+        echo "version: '${{ inputs.version }}'"
+        cargo release --workspace --token ${{ inputs.crates-token }} --isolated --no-dev-version --no-push --no-tag --dependent-version error --verbose $(if [ "${{ inputs.dry-run }}" = "false" ]; then echo --execute --no-confirm; fi) ${{ inputs.version }}

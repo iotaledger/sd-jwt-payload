@@ -1,0 +1,43 @@
+name: Format
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - 'epic/**'
+      - 'support/**'
+    paths:
+      - '.github/workflows/format.yml'
+      - '**.rs'
+      - '**.toml'
+      - '**.ts'
+      - '**.js'
+      - '**.json'
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # we use nightly to get access to advanced format capabilities
+      - name: Setup Rust
+        uses: './.github/actions/rust/rust-setup'
+        with:
+          toolchain: nightly
+          components: rustfmt
+
+      - name: Install cargo-license-template
+        run: cargo install cargo-license-template
+
+      - name: core fmt check
+        run: cargo +nightly fmt --all -- --check
+
+      - name: cargo-license-template check
+        run: cargo +nightly license-template --template .license_template --ignore .license_template_ignore --verbose
