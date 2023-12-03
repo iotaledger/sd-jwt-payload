@@ -55,16 +55,16 @@ impl TryFrom<Value> for SdObjectEncoder {
         salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
         hasher: Sha256Hasher::new(),
       }),
-      _ => Err(Error::DataTypeMismatch("Expected object".to_owned())),
+      _ => Err(Error::DataTypeMismatch("expected object".to_owned())),
     }
   }
 }
 
 impl<H: Hasher> SdObjectEncoder<H> {
   /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests.
-  pub fn with_custom_hasher(json: &str, hasher: H) -> Result<Self> {
+  pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
     Ok(Self {
-      object: serde_json::from_str(json).map_err(|e| Error::DeserializationError(e.to_string()))?,
+      object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
       salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
       hasher,
     })
@@ -153,7 +153,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
       *element_value = tripledot;
       Ok(disclosure)
     } else {
-      Err(Error::IndexOutofBounds)
+      Err(Error::IndexOutofBounds(element_index))
     }
   }
 
@@ -236,8 +236,8 @@ impl<H: Hasher> SdObjectEncoder<H> {
     }
   }
 
+  /// Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
   fn add_digest_to_object(object: &mut Map<String, Value>, digest: String) -> Result<()> {
-    // Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
     if let Some(sd_value) = object.get_mut(DIGESTS_KEY) {
       if let Value::Array(value) = sd_value {
         value.push(Value::String(digest))
@@ -334,7 +334,7 @@ mod test {
     encoder.conceal(&["claim1", "abc"], None).unwrap();
     assert!(matches!(
       encoder.conceal_array_entry(&["claim2"], 2, None).unwrap_err(),
-      Error::IndexOutofBounds
+      Error::IndexOutofBounds(2)
     ));
   }
 

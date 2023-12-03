@@ -58,7 +58,7 @@ impl SdObjectDecoder {
     disclosures: &Vec<String>,
   ) -> Result<Map<String, Value>, crate::Error> {
     // Determine hasher.
-    let hasher = self.determin_hasher(object)?;
+    let hasher = self.determine_hasher(object)?;
 
     // Create a map of (disclosure digest) → (disclosure).
     let mut disclosures_map: BTreeMap<String, Disclosure> = BTreeMap::new();
@@ -68,7 +68,7 @@ impl SdObjectDecoder {
       disclosures_map.insert(digest, parsed_disclosure);
     }
 
-    // `processed_digests` are kept track of in case on digests appears more than once which
+    // `processed_digests` are kept track of in case one digest appears more than once which
     // renders the SD-JWT invalid.
     let mut processed_digests: Vec<String> = vec![];
 
@@ -80,12 +80,12 @@ impl SdObjectDecoder {
     Ok(decoded)
   }
 
-  pub fn determin_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
+  pub fn determine_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
     //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
     let alg: &str = if let Some(alg) = object.get("_sd_alg") {
-      alg
-        .as_str()
-        .ok_or(Error::DataTypeMismatch("`_sd_alg` is not a string".to_string()))?
+      alg.as_str().ok_or(Error::DataTypeMismatch(
+        "the value of `_sd_alg` is not a string".to_string(),
+      ))?
     } else {
       Sha256Hasher::ALG_NAME
     };
@@ -93,7 +93,7 @@ impl SdObjectDecoder {
       .hashers
       .get(alg)
       .map(AsRef::as_ref)
-      .ok_or(Error::HashingAlgorithmError)
+      .ok_or(Error::MissingHasher(alg.to_string()))
   }
 
   fn decode_object(
@@ -159,6 +159,7 @@ impl SdObjectDecoder {
             output.insert(key.to_string(), Value::Array(decoded_array));
           }
         }
+        // Only objects and arrays require decoding.
         _ => {}
       }
     }

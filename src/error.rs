@@ -7,11 +7,11 @@ pub type Result<T> = ::core::result::Result<T, Error>;
 #[derive(Debug, thiserror::Error, strum::IntoStaticStr)]
 #[non_exhaustive]
 pub enum Error {
-  #[error("invalid input {0}")]
+  #[error("invalid input: {0}")]
   InvalidDisclosure(String),
 
-  #[error("no hashing algorithm can be specified for the provided input")]
-  HashingAlgorithmError,
+  #[error("no hasher can be specified for the hashing algorithm {0}")]
+  MissingHasher(String),
 
   #[error("data type is not expected: {0}")]
   DataTypeMismatch(String),
@@ -31,8 +31,8 @@ pub enum Error {
   #[error("invalid input")]
   DeserializationError(String),
 
-  #[error("index out of bounds for the array was provided")]
-  IndexOutofBounds,
+  #[error("index {0} is out of bounds for the provided array")]
+  IndexOutofBounds(usize),
 
   #[error("{0}")]
   Unspecified(String),

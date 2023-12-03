@@ -8,7 +8,15 @@ use crypto::hashes::sha::SHA256_LEN;
 pub trait Hasher: Sync + Send {
   /// Digests input to produce unique fixed-size hash value in bytes.
   fn digest(&self, input: &[u8]) -> Vec<u8>;
+
   /// Returns the name of hash function used.
+  ///
+  /// ## Note
+  ///
+  /// The hash algorithm identifier MUST be a hash algorithm value
+  /// from the "Hash Name String" column in the IANA "Named Information
+  /// Hash Algorithm" registry [IANA.Hash.Algorithms](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#IANA.Hash.Algorithms)
+  /// or a value defined in another specification and/or profile of this specification.
   fn alg_name(&self) -> &'static str;
 }
 

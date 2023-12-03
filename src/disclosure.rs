@@ -32,7 +32,7 @@ impl Disclosure {
       format!("[\"{}\", {}]", &salt, &claim_value.to_string())
     };
 
-    let encoded = multibase::Base::Base64.encode(input);
+    let encoded = multibase::Base::Base64Url.encode(input);
     Self {
       salt,
       claim_name,
