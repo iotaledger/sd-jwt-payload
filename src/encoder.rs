@@ -7,7 +7,6 @@ use super::Sha256Hasher;
 use crate::Error;
 use crate::Result;
 use crate::Utils;
-use rand::distributions::DistString;
 use rand::Rng;
 use serde_json::json;
 use serde_json::Map;
@@ -23,9 +22,9 @@ pub(crate) const SD_ALG: &str = "_sd_alg";
 pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   /// The object in JSON format.
   object: Map<String, Value>,
-  /// Length of the salts that generated for disclosures.
+  /// Size of random data used to generate the salts for disclosures in bytes.
   /// Constant length for readability considerations.
-  salt_length: usize,
+  salt_size: usize,
   /// The hash function used to create digests.
   hasher: H,
 }
@@ -38,7 +37,7 @@ impl SdObjectEncoder {
   pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
     Ok(SdObjectEncoder {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: DEFAULT_SALT_SIZE,
+      salt_size: DEFAULT_SALT_SIZE,
       hasher: Sha256Hasher::new(),
     })
   }
@@ -60,7 +59,7 @@ impl TryFrom<Value> for SdObjectEncoder {
     match value {
       Value::Object(object) => Ok(SdObjectEncoder {
         object,
-        salt_length: DEFAULT_SALT_SIZE,
+        salt_size: DEFAULT_SALT_SIZE,
         hasher: Sha256Hasher::new(),
       }),
       _ => Err(Error::DataTypeMismatch("expected object".to_owned())),
@@ -73,7 +72,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
     Ok(Self {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: DEFAULT_SALT_SIZE,
+      salt_size: DEFAULT_SALT_SIZE,
       hasher,
     })
   }
@@ -97,7 +96,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     }
 
     // Determine salt.
-    let salt = salt.unwrap_or(Self::gen_rand(self.salt_length));
+    let salt = salt.unwrap_or(Self::gen_rand(self.salt_size));
 
     // Obtain the parent of the property specified by the provided path.
     let (target_key, parent_value) = Self::get_target_property_and_its_parent(&mut self.object, path)?;
@@ -141,7 +140,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     }
 
     // Determine salt.
-    let salt = salt.unwrap_or(Self::gen_rand(self.salt_length));
+    let salt = salt.unwrap_or(Self::gen_rand(self.salt_size));
 
     // Obtain the parent of the property specified by the provided path.
     let (target_key, parent_value) = Self::get_target_property_and_its_parent(&mut self.object, path)?;
@@ -215,7 +214,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
   fn add_decoy(&mut self, path: &[&str]) -> Result<Disclosure> {
     if path.is_empty() {
-      let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
+      let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
       Self::add_digest_to_object(&mut self.object, hash)?;
       Ok(disclosure)
     } else {
@@ -226,11 +225,11 @@ impl<H: Hasher> SdObjectEncoder<H> {
         .ok_or(Error::InvalidPath(format!("{} does not exist", target_key)))?;
 
       if let Some(object) = value.as_object_mut() {
-        let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
+        let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
         Self::add_digest_to_object(object, hash)?;
         Ok(disclosure)
       } else if let Some(array) = value.as_array_mut() {
-        let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_length, true);
+        let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});
         array.push(tripledot);
         Ok(disclosure)
@@ -276,8 +275,9 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   fn gen_rand(len: usize) -> String {
-    // todo: check if random is cryptographically secure.
-    rand::distributions::Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    let mut rng = rand::thread_rng();
+    let random_bytes: Vec<u8> = (0..len).map(|_| rng.gen()).collect();
+    multibase::Base::Base64Url.encode(random_bytes)
   }
 
   /// Returns a reference to the internal object.
@@ -291,17 +291,19 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Returns the used salt length.
-  pub fn salt_length(&self) -> usize {
-    self.salt_length
+  pub fn salt_size(&self) -> usize {
+    self.salt_size
   }
 
-  /// Sets the used salt length.
+  /// Sets size of random data used to generate the salts for disclosures in bytes.
   ///
   /// ## Warning
-  /// If the new value is 0, it will not be set.
-  pub fn set_salt_length(&mut self, salt_length: usize) {
-    if salt_length > 0 {
-      self.salt_length = salt_length
+  /// Salt size must be >= 16.
+  pub fn set_salt_size(&mut self, salt_size: usize) -> Result<()> {
+    if salt_size < 16 {
+      Err(Error::InvalidSaltSize)
+    } else {
+      Ok(self.salt_size = salt_size)
     }
   }
 }
