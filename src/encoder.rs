@@ -16,6 +16,7 @@ use serde_json::Value;
 pub(crate) const DIGESTS_KEY: &str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 pub(crate) const DEFAULT_SALT_SIZE: usize = 30;
+pub(crate) const SD_ALG: &str = "_sd_alg";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
@@ -185,7 +186,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   pub fn add_sd_alg_property(&mut self) -> Option<Value> {
     self
       .object
-      .insert("_sd_alg".to_string(), Value::String(self.hasher.alg_name().to_string()))
+      .insert(SD_ALG.to_string(), Value::String(self.hasher.alg_name().to_string()))
   }
 
   /// Returns the modified object as a string.

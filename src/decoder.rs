@@ -4,6 +4,7 @@
 use crate::Utils;
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
+use crate::SD_ALG;
 
 use super::Disclosure;
 use super::Hasher;
@@ -76,13 +77,13 @@ impl SdObjectDecoder {
     let mut decoded = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
 
     // Remove `_sd_alg` in case it exists.
-    decoded.remove("_sd_alg");
+    decoded.remove(SD_ALG);
     Ok(decoded)
   }
 
   pub fn determine_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
     //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
-    let alg: &str = if let Some(alg) = object.get("_sd_alg") {
+    let alg: &str = if let Some(alg) = object.get(SD_ALG) {
       alg.as_str().ok_or(Error::DataTypeMismatch(
         "the value of `_sd_alg` is not a string".to_string(),
       ))?
