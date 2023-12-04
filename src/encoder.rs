@@ -42,6 +42,15 @@ impl SdObjectEncoder {
       hasher: Sha256Hasher::new(),
     })
   }
+
+  /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function from a serializable object.
+  ///
+  /// ## Error
+  /// Returns [`Error::DeserializationError`] if `object` can not be serialized into a valid JSON object.
+  pub fn try_from_serializable<T: serde::Serialize>(object: T) -> std::result::Result<Self, crate::Error> {
+    let value: String = serde_json::to_string(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+    Self::new(&value)
+  }
 }
 
 impl TryFrom<Value> for SdObjectEncoder {
@@ -299,10 +308,18 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
 #[cfg(test)]
 mod test {
+
   use super::SdObjectEncoder;
   use crate::Error;
+  use serde::Serialize;
   use serde_json::json;
   use serde_json::Value;
+
+  #[derive(Serialize)]
+  struct TestStruct {
+    id: String,
+    claim2: Vec<String>,
+  }
 
   fn object() -> Value {
     json!({
@@ -347,5 +364,20 @@ mod test {
       encoder.conceal_array_entry(&["claim12"], 0, None).unwrap_err(),
       Error::InvalidPath(_)
     ));
+  }
+
+  #[test]
+  fn test_from_serializable() {
+    let test_value = TestStruct {
+      id: "did:value".to_string(),
+      claim2: vec!["arr-value1".to_string(), "arr-vlaue2".to_string()],
+    };
+    let mut encoder = SdObjectEncoder::try_from_serializable(test_value).unwrap();
+    encoder.conceal(&["id"], None).unwrap();
+    encoder.add_decoys(&[], 10).unwrap();
+    encoder.add_decoys(&["claim2"], 10).unwrap();
+    assert!(encoder.object().get("id").is_none());
+    assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
+    assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
   }
 }
