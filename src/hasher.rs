@@ -5,6 +5,12 @@ use crypto::hashes::sha::SHA256;
 use crypto::hashes::sha::SHA256_LEN;
 
 /// Used to implement hash functions to be used for encoding/decoding.
+///
+/// ## Note
+///
+/// Implementations of this trait are expected only for algorithms listed in
+/// the IANA "Named Information Hash Algorithm" registry.
+/// See [Hash Function Claim](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#name-hash-function-claim)
 pub trait Hasher: Sync + Send {
   /// Digests input to produce unique fixed-size hash value in bytes.
   fn digest(&self, input: &[u8]) -> Vec<u8>;
@@ -13,10 +19,8 @@ pub trait Hasher: Sync + Send {
   ///
   /// ## Note
   ///
-  /// The hash algorithm identifier MUST be a hash algorithm value
-  /// from the "Hash Name String" column in the IANA "Named Information
-  /// Hash Algorithm" registry [IANA.Hash.Algorithms](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#IANA.Hash.Algorithms)
-  /// or a value defined in another specification and/or profile of this specification.
+  /// The hash algorithm identifier MUST be a hash algorithm value from the
+  /// "Hash Name String" column in the IANA "Named Information Hash Algorithm"  
   fn alg_name(&self) -> &'static str;
 }
 

@@ -1,8 +1,6 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::Range;
-
 use super::Disclosure;
 use super::Hasher;
 use super::Sha256Hasher;
@@ -17,7 +15,7 @@ use serde_json::Value;
 
 pub(crate) const DIGESTS_KEY: &str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
-pub(crate) const DEFAULT_SALT_RANGE: Range<usize> = 24..34;
+pub(crate) const DEFAULT_SALT_SIZE: usize = 30;
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
@@ -39,7 +37,7 @@ impl SdObjectEncoder {
   pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
     Ok(SdObjectEncoder {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
+      salt_length: DEFAULT_SALT_SIZE,
       hasher: Sha256Hasher::new(),
     })
   }
@@ -52,7 +50,7 @@ impl TryFrom<Value> for SdObjectEncoder {
     match value {
       Value::Object(object) => Ok(SdObjectEncoder {
         object,
-        salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
+        salt_length: DEFAULT_SALT_SIZE,
         hasher: Sha256Hasher::new(),
       }),
       _ => Err(Error::DataTypeMismatch("expected object".to_owned())),
@@ -65,7 +63,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
     Ok(Self {
       object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
-      salt_length: rand::thread_rng().gen_range(DEFAULT_SALT_RANGE),
+      salt_length: DEFAULT_SALT_SIZE,
       hasher,
     })
   }
@@ -198,12 +196,11 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
   /// Adds a decoy digest to the specified path.
   /// If path is an empty slice, decoys will be added to the top level.
-  pub fn add_decoys(&mut self, path: &[&str], number_of_decoys: usize) -> Result<Vec<Disclosure>> {
-    let mut disclosures = vec![];
+  pub fn add_decoys(&mut self, path: &[&str], number_of_decoys: usize) -> Result<()> {
     for _ in 0..number_of_decoys {
-      disclosures.push(self.add_decoy(path)?);
+      self.add_decoy(path)?;
     }
-    Ok(disclosures)
+    Ok(())
   }
 
   fn add_decoy(&mut self, path: &[&str]) -> Result<Disclosure> {
