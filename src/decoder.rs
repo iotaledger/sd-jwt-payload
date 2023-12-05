@@ -4,9 +4,11 @@
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
 use crate::SD_ALG;
+use crate::SHA_ALG_NAME;
 
 use super::Disclosure;
 use super::Hasher;
+#[cfg(feature = "sha")]
 use super::Sha256Hasher;
 use crate::Error;
 use serde_json::Map;
@@ -20,11 +22,18 @@ pub struct SdObjectDecoder {
 
 impl SdObjectDecoder {
   /// Creates a new [`SdObjectDecoder`] with `sha-256` hasher.
-  pub fn new() -> Self {
+  #[cfg(feature = "sha")]
+  pub fn new_with_sha256() -> Self {
     let hashers: BTreeMap<String, Box<dyn Hasher>> = BTreeMap::new();
     let mut hasher = Self { hashers };
     hasher.add_hasher(Box::new(Sha256Hasher::new()));
     hasher
+  }
+
+  /// Creates a new [`SdObjectDecoder`] without any hashers.
+  pub fn new() -> Self {
+    let hashers: BTreeMap<String, Box<dyn Hasher>> = BTreeMap::new();
+    Self { hashers }
   }
 
   /// Adds a hasher.
@@ -87,7 +96,7 @@ impl SdObjectDecoder {
         "the value of `_sd_alg` is not a string".to_string(),
       ))?
     } else {
-      Sha256Hasher::ALG_NAME
+      SHA_ALG_NAME
     };
     self
       .hashers
@@ -227,9 +236,10 @@ impl SdObjectDecoder {
   }
 }
 
+#[cfg(feature = "sha")]
 impl Default for SdObjectDecoder {
   fn default() -> Self {
-    Self::new()
+    Self::new_with_sha256()
   }
 }
 
@@ -251,7 +261,7 @@ mod test {
     encoder
       .object_mut()
       .insert("id".to_string(), Value::String("id-value".to_string()));
-    let decoder = SdObjectDecoder::new();
+    let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder.decode(encoder.object(), &vec![dis.to_string()]).unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
@@ -267,7 +277,7 @@ mod test {
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
     assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
-    let decoder = SdObjectDecoder::new();
+    let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }

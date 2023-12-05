@@ -1,8 +1,13 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "sha")]
 use crypto::hashes::sha::SHA256;
+
+#[cfg(feature = "sha")]
 use crypto::hashes::sha::SHA256_LEN;
+
+pub const SHA_ALG_NAME: &'static str = "sha-256";
 
 /// Used to implement hash functions to be used for encoding/decoding.
 ///
@@ -32,16 +37,17 @@ pub trait Hasher: Sync + Send {
 
 /// An implementation of [`Hasher`] that uses the `sha-256` hash function.
 #[derive(Default)]
+#[cfg(feature = "sha")]
 pub struct Sha256Hasher;
 
+#[cfg(feature = "sha")]
 impl Sha256Hasher {
-  pub const ALG_NAME: &'static str = "sha-256";
   /// Creates a new [`ShaHasher`]
   pub fn new() -> Self {
     Sha256Hasher {}
   }
 }
-
+#[cfg(feature = "sha")]
 impl Hasher for Sha256Hasher {
   fn digest(&self, input: &[u8]) -> Vec<u8> {
     let mut digest: [u8; SHA256_LEN] = Default::default();
@@ -50,7 +56,7 @@ impl Hasher for Sha256Hasher {
   }
 
   fn alg_name(&self) -> &'static str {
-    Sha256Hasher::ALG_NAME
+    SHA_ALG_NAME
   }
 }
 

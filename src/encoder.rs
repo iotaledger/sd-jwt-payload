@@ -3,6 +3,7 @@
 
 use super::Disclosure;
 use super::Hasher;
+#[cfg(feature = "sha")]
 use super::Sha256Hasher;
 use crate::Error;
 use crate::Result;
@@ -18,6 +19,20 @@ pub(crate) const SD_ALG: &str = "_sd_alg";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
+#[cfg(not(feature = "sha"))]
+pub struct SdObjectEncoder<H: Hasher> {
+  /// The object in JSON format.
+  object: Map<String, Value>,
+  /// Size of random data used to generate the salts for disclosures in bytes.
+  /// Constant length for readability considerations.
+  salt_size: usize,
+  /// The hash function used to create digests.
+  hasher: H,
+}
+
+/// Transforms a JSON object into an SD-JWT object by substituting selected values
+/// with their corresponding disclosure digests.
+#[cfg(feature = "sha")]
 pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   /// The object in JSON format.
   object: Map<String, Value>,
@@ -28,6 +43,7 @@ pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   hasher: H,
 }
 
+#[cfg(feature = "sha")]
 impl SdObjectEncoder {
   /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function.
   ///
@@ -51,6 +67,7 @@ impl SdObjectEncoder {
   }
 }
 
+#[cfg(feature = "sha")]
 impl TryFrom<Value> for SdObjectEncoder {
   type Error = crate::Error;
 
