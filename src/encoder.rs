@@ -33,6 +33,7 @@ pub struct SdObjectEncoder<H: Hasher> {
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
 #[cfg(feature = "sha")]
+#[derive(Debug, Clone)]
 pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
   /// The object in JSON format.
   object: Map<String, Value>,

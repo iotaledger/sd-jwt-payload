@@ -36,7 +36,7 @@ pub trait Hasher: Sync + Send {
 }
 
 /// An implementation of [`Hasher`] that uses the `sha-256` hash function.
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[cfg(feature = "sha")]
 pub struct Sha256Hasher;
 
