@@ -1,7 +1,6 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Utils;
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
 use crate::SD_ALG;
@@ -65,7 +64,7 @@ impl SdObjectDecoder {
     let mut disclosures_map: BTreeMap<String, Disclosure> = BTreeMap::new();
     for disclosure in disclosures {
       let parsed_disclosure = Disclosure::parse(disclosure.to_string())?;
-      let digest = Utils::digest_b64_url_only_ascii(hasher, disclosure.as_str());
+      let digest = hasher.encoded_digest(disclosure.as_str());
       disclosures_map.insert(digest, parsed_disclosure);
     }
 

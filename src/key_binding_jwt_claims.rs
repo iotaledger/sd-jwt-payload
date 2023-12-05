@@ -7,7 +7,6 @@ use std::time::SystemTime;
 use itertools::Itertools;
 use serde_json::Value;
 
-use crate::utils::Utils;
 use crate::Hasher;
 use serde::Deserialize;
 use serde::Serialize;
@@ -40,7 +39,7 @@ impl KeyBindingJwtClaims {
   ) -> Self {
     let disclosures = disclosures.iter().join("~");
     let sd_jwt = format!("{}~{}~", jwt, disclosures);
-    let hash = Utils::digest_b64_url_only_ascii(hasher, &sd_jwt);
+    let hash = hasher.encoded_digest(&sd_jwt);
     let iat = issued_at.unwrap_or(
       SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)

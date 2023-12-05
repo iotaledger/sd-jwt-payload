@@ -6,7 +6,6 @@ use super::Hasher;
 use super::Sha256Hasher;
 use crate::Error;
 use crate::Result;
-use crate::Utils;
 use rand::Rng;
 use serde_json::json;
 use serde_json::Map;
@@ -111,7 +110,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     );
 
     // Hash the disclosure.
-    let hash = Utils::digest_b64_url_only_ascii(&self.hasher, disclosure.as_str());
+    let hash = self.hasher.encoded_digest(disclosure.as_str());
 
     // Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
     Self::add_digest_to_object(parent_value, hash)?;
@@ -155,7 +154,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     // of form "{"...": "<digest>"}".
     if let Some(element_value) = array.get_mut(element_index) {
       let disclosure = Disclosure::new(salt, None, element_value.clone());
-      let hash = Utils::digest_b64_url_only_ascii(&self.hasher, disclosure.as_str());
+      let hash = self.hasher.encoded_digest(disclosure.as_str());
       let tripledot = json!({ARRAY_DIGEST_KEY: hash});
       *element_value = tripledot;
       Ok(disclosure)
@@ -270,7 +269,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     };
     let decoy_value = Self::gen_rand(decoy_value_length);
     let disclosure = Disclosure::new(salt, decoy_claim_name, Value::String(decoy_value));
-    let hash = Utils::digest_b64_url_only_ascii(hasher, disclosure.as_str());
+    let hash = hasher.encoded_digest(disclosure.as_str());
     (disclosure, hash)
   }
 
