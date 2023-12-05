@@ -320,7 +320,8 @@ impl<H: Hasher> SdObjectEncoder<H> {
     if salt_size < 16 {
       Err(Error::InvalidSaltSize)
     } else {
-      Ok(self.salt_size = salt_size)
+      self.salt_size = salt_size;
+      Ok(())
     }
   }
 }

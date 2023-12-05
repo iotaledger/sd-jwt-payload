@@ -7,7 +7,7 @@ use crypto::hashes::sha::SHA256;
 #[cfg(feature = "sha")]
 use crypto::hashes::sha::SHA256_LEN;
 
-pub const SHA_ALG_NAME: &'static str = "sha-256";
+pub const SHA_ALG_NAME: &str = "sha-256";
 
 /// Used to implement hash functions to be used for encoding/decoding.
 ///
@@ -63,7 +63,8 @@ impl Hasher for Sha256Hasher {
 // Some test values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.html#name-hashing-disclosures
 #[cfg(test)]
 mod test {
-  use crate::{Hasher, Sha256Hasher};
+  use crate::Hasher;
+  use crate::Sha256Hasher;
 
   #[test]
   fn test1() {
