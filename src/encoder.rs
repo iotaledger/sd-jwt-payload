@@ -302,7 +302,8 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Returns a mutable reference to the internal object.
-  pub fn object_mut(&mut self) -> &mut Map<String, Value> {
+  #[cfg(test)]
+  pub(crate) fn object_mut(&mut self) -> &mut Map<String, Value> {
     &mut self.object
   }
 
