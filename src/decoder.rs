@@ -1,12 +1,14 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Utils;
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
+use crate::SD_ALG;
+use crate::SHA_ALG_NAME;
 
 use super::Disclosure;
 use super::Hasher;
+#[cfg(feature = "sha")]
 use super::Sha256Hasher;
 use crate::Error;
 use serde_json::Map;
@@ -20,11 +22,18 @@ pub struct SdObjectDecoder {
 
 impl SdObjectDecoder {
   /// Creates a new [`SdObjectDecoder`] with `sha-256` hasher.
-  pub fn new() -> Self {
+  #[cfg(feature = "sha")]
+  pub fn new_with_sha256() -> Self {
     let hashers: BTreeMap<String, Box<dyn Hasher>> = BTreeMap::new();
     let mut hasher = Self { hashers };
     hasher.add_hasher(Box::new(Sha256Hasher::new()));
     hasher
+  }
+
+  /// Creates a new [`SdObjectDecoder`] without any hashers.
+  pub fn new() -> Self {
+    let hashers: BTreeMap<String, Box<dyn Hasher>> = BTreeMap::new();
+    Self { hashers }
   }
 
   /// Adds a hasher.
@@ -64,7 +73,7 @@ impl SdObjectDecoder {
     let mut disclosures_map: BTreeMap<String, Disclosure> = BTreeMap::new();
     for disclosure in disclosures {
       let parsed_disclosure = Disclosure::parse(disclosure.to_string())?;
-      let digest = Utils::digest_b64_url_only_ascii(hasher, disclosure.as_str());
+      let digest = hasher.encoded_digest(disclosure.as_str());
       disclosures_map.insert(digest, parsed_disclosure);
     }
 
@@ -76,18 +85,18 @@ impl SdObjectDecoder {
     let mut decoded = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
 
     // Remove `_sd_alg` in case it exists.
-    decoded.remove("_sd_alg");
+    decoded.remove(SD_ALG);
     Ok(decoded)
   }
 
   pub fn determine_hasher(&self, object: &Map<String, Value>) -> Result<&dyn Hasher, Error> {
     //If the _sd_alg claim is not present at the top level, a default value of sha-256 MUST be used.
-    let alg: &str = if let Some(alg) = object.get("_sd_alg") {
+    let alg: &str = if let Some(alg) = object.get(SD_ALG) {
       alg.as_str().ok_or(Error::DataTypeMismatch(
         "the value of `_sd_alg` is not a string".to_string(),
       ))?
     } else {
-      Sha256Hasher::ALG_NAME
+      SHA_ALG_NAME
     };
     self
       .hashers
@@ -227,9 +236,10 @@ impl SdObjectDecoder {
   }
 }
 
+#[cfg(feature = "sha")]
 impl Default for SdObjectDecoder {
   fn default() -> Self {
-    Self::new()
+    Self::new_with_sha256()
   }
 }
 
@@ -251,7 +261,7 @@ mod test {
     encoder
       .object_mut()
       .insert("id".to_string(), Value::String("id-value".to_string()));
-    let decoder = SdObjectDecoder::new();
+    let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder.decode(encoder.object(), &vec![dis.to_string()]).unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
@@ -267,7 +277,7 @@ mod test {
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
     assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
-    let decoder = SdObjectDecoder::new();
+    let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }

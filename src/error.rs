@@ -36,4 +36,7 @@ pub enum Error {
 
   #[error("{0}")]
   Unspecified(String),
+
+  #[error("salt size must be greater than or equal to 16")]
+  InvalidSaltSize,
 }

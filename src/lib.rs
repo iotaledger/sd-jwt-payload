@@ -1,8 +1,6 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-mod api_test;
 mod decoder;
 mod disclosure;
 mod encoder;
@@ -10,7 +8,6 @@ mod error;
 mod hasher;
 mod key_binding_jwt_claims;
 mod sd_jwt;
-mod utils;
 
 pub use decoder::*;
 pub use disclosure::*;
@@ -22,4 +19,3 @@ pub use sd_jwt::*;
 pub use serde_json::json;
 pub use serde_json::Map;
 pub use serde_json::Value;
-pub use utils::*;
