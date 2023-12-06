@@ -292,9 +292,11 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   fn gen_rand(len: usize) -> String {
+    let mut bytes = vec![0; len];
     let mut rng = rand::thread_rng();
-    let random_bytes: Vec<u8> = (0..len).map(|_| rng.gen()).collect();
-    multibase::Base::Base64Url.encode(random_bytes)
+    rng.fill(&mut bytes[..]);
+
+    multibase::Base::Base64Url.encode(bytes)
   }
 
   /// Returns a reference to the internal object.

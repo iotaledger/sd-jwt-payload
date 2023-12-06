@@ -11,10 +11,10 @@ use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::Disclosure;
-use crate::SdJwt;
-use crate::SdObjectDecoder;
-use crate::SdObjectEncoder;
+use sd_jwt::Disclosure;
+use sd_jwt::SdJwt;
+use sd_jwt::SdObjectDecoder;
+use sd_jwt::SdObjectEncoder;
 
 #[test]
 fn test_complex_structure() {
@@ -169,7 +169,7 @@ fn decode() {
   // Values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#name-example-2-handling-structur
   let sd_jwt = "eyJhbGciOiAiRVMyNTYifQ.eyJfc2QiOiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1FyazFXSF84YmR3T0FfWVVyVW5HUVUiLCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZzZKMmtTZnFZUkJlb3d2RSIsICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZkx2S2hoX2ZfOWFZIiwgIlg2WkFZT0lJMnZQTjQwVjd4RXhad1Z3ejd5Um1MTmNWd3Q1REw4Ukx2NGciLCAiWTM0em1JbzBRTExPdGRNcFhHd2pCZ0x2cjE3eUVoaFlUMEZHb2ZSLWFJRSIsICJmeUdwMFdUd3dQdjJKRFFsbjFsU2lhZW9iWnNNV0ExMGJRNTk4OS05RFRzIiwgIm9tbUZBaWNWVDhMR0hDQjB1eXd4N2ZZdW8zTUhZS08xNWN6LVJaRVlNNVEiLCAiczBCS1lzTFd4UVFlVTh0VmxsdE03TUtzSVJUckVJYTFQa0ptcXhCQmY1VSJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAiYWRkcmVzcyI6IHsiX3NkIjogWyI2YVVoelloWjdTSjFrVm1hZ1FBTzN1MkVUTjJDQzFhSGhlWnBLbmFGMF9FIiwgIkF6TGxGb2JrSjJ4aWF1cFJFUHlvSnotOS1OU2xkQjZDZ2pyN2ZVeW9IemciLCAiUHp6Y1Z1MHFiTXVCR1NqdWxmZXd6a2VzRDl6dXRPRXhuNUVXTndrclEtayIsICJiMkRrdzBqY0lGOXJHZzhfUEY4WmN2bmNXN3p3Wmo1cnlCV3ZYZnJwemVrIiwgImNQWUpISVo4VnUtZjlDQ3lWdWIyVWZnRWs4anZ2WGV6d0sxcF9KbmVlWFEiLCAiZ2xUM2hyU1U3ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25VbGRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0MG9pZEVlVnNBIiwgInVOSG9XWWhYc1poVkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R3JNWDQiXX0sICJfc2RfYWxnIjogInNoYS0yNTYifQ.IjE4EfnYu1RZ1uz6yqtFh5Lppq36VC4VeSr-hLDFpZ9zqBNmMrT5JHLLXTuMJqKQp3NIzDsLaft4GK5bYyfqhg~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInJlZ2lvbiIsICJcdTZlMmZcdTUzM2EiXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~";
   let sd_jwt: SdJwt = SdJwt::parse(sd_jwt).unwrap();
-  let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &DeocyJwsVerifier {}).unwrap();
+  let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &DecoyJwsVerifier {}).unwrap();
   let decoder = SdObjectDecoder::new_with_sha256();
   let decoded: Map<String, Value> = decoder.decode(payload.claims_set(), &sd_jwt.disclosures).unwrap();
   let expected_object = json!({
@@ -202,8 +202,8 @@ impl JwsAlgorithm for DecoyJwsAlgorithm {
 }
 
 #[derive(Debug, Clone)]
-struct DeocyJwsVerifier;
-impl JwsVerifier for DeocyJwsVerifier {
+struct DecoyJwsVerifier;
+impl JwsVerifier for DecoyJwsVerifier {
   fn algorithm(&self) -> &dyn josekit::jws::JwsAlgorithm {
     &DecoyJwsAlgorithm {}
   }
