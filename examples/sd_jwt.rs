@@ -39,20 +39,20 @@ fn main() -> Result<(), Box<dyn Error>> {
   let mut encoder: SdObjectEncoder = object.try_into()?;
   let disclosure = encoder.conceal(&["email"], None)?;
   disclosures.push(disclosure);
-  let disclosure = encoder.conceal(&["phone_number"], None);
-  disclosures.push(disclosure?);
-  let disclosure = encoder.conceal(&["address", "street_address"], None);
-  disclosures.push(disclosure?);
-  let disclosure = encoder.conceal(&["address"], None);
-  disclosures.push(disclosure?);
-  let disclosure = encoder.conceal_array_entry(&["nationalities"], 0, None);
-  disclosures.push(disclosure?);
+  let disclosure = encoder.conceal(&["phone_number"], None)?;
+  disclosures.push(disclosure);
+  let disclosure = encoder.conceal(&["address", "street_address"], None)?;
+  disclosures.push(disclosure);
+  let disclosure = encoder.conceal(&["address"], None)?;
+  disclosures.push(disclosure);
+  let disclosure = encoder.conceal_array_entry(&["nationalities"], 0, None)?;
+  disclosures.push(disclosure);
   encoder.add_sd_alg_property();
 
   println!("encoded object: {}", serde_json::to_string_pretty(encoder.object())?);
 
   // Create the JWT.
-  // Creating JWTs is out of the scope of this library, josekit is used here as an example
+  // Creating JWTs is outside the scope of this library, josekit is used here as an example.
   let mut header = JwsHeader::new();
   header.set_token_type("sd-jwt");
 
