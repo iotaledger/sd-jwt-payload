@@ -6,10 +6,12 @@ use std::fmt::Display;
 use crate::Error;
 use crate::Result;
 use itertools::Itertools;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Representation of an SD-JWT of the format
 /// `<Issuer-signed JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SdJwt {
   /// The JWT part.
   pub jwt: String,
