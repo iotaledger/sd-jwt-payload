@@ -24,6 +24,8 @@ pub struct KeyBindingJwtClaims {
 }
 
 impl KeyBindingJwtClaims {
+  pub const KB_JWT_HEADER_TYP: &'static str = " kb+jwt";
+
   /// Creates a new [`KeyBindingJwtClaims`].
   /// When `issued_at` is left as None, it will automatically default to the current time
   ///
