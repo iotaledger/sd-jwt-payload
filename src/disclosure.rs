@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Display;
 
@@ -9,7 +11,7 @@ use std::fmt::Display;
 /// Object properties and array elements disclosures are supported.
 ///
 /// See: https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#name-disclosures
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Disclosure {
   /// The salt value.
   pub salt: String,
