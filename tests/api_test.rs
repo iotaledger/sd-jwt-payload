@@ -11,10 +11,10 @@ use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
 
-use sd_jwt::Disclosure;
-use sd_jwt::SdJwt;
-use sd_jwt::SdObjectDecoder;
-use sd_jwt::SdObjectEncoder;
+use sd_jwt_payload::Disclosure;
+use sd_jwt_payload::SdJwt;
+use sd_jwt_payload::SdObjectDecoder;
+use sd_jwt_payload::SdObjectEncoder;
 
 #[test]
 fn test_complex_structure() {

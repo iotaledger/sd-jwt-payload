@@ -7,10 +7,10 @@ use josekit::jws::JwsHeader;
 use josekit::jws::HS256;
 use josekit::jwt::JwtPayload;
 use josekit::jwt::{self};
-use sd_jwt::Disclosure;
-use sd_jwt::SdJwt;
-use sd_jwt::SdObjectDecoder;
-use sd_jwt::SdObjectEncoder;
+use sd_jwt_payload::Disclosure;
+use sd_jwt_payload::SdJwt;
+use sd_jwt_payload::SdObjectDecoder;
+use sd_jwt_payload::SdObjectEncoder;
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn Error>> {
