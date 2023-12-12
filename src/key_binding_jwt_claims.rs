@@ -11,13 +11,12 @@ use crate::Hasher;
 use serde::Deserialize;
 use serde::Serialize;
 
-///
+/// Claims set for key binding JWT.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct KeyBindingJwtClaims {
   pub iat: i64,
   pub aud: String,
   pub nonce: String,
-  #[serde(rename = "_sd_hash")]
   pub sd_hash: String,
   #[serde(flatten)]
   pub properties: BTreeMap<String, Value>,
@@ -27,7 +26,7 @@ impl KeyBindingJwtClaims {
   pub const KB_JWT_HEADER_TYP: &'static str = " kb+jwt";
 
   /// Creates a new [`KeyBindingJwtClaims`].
-  /// When `issued_at` is left as None, it will automatically default to the current time
+  /// When `issued_at` is left as None, it will automatically default to the current time.
   ///
   /// # Panic
   /// When `issued_at` is set to `None` and the system returns time earlier than `SystemTime::UNIX_EPOCH`.

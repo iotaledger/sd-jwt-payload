@@ -18,7 +18,7 @@ use sd_jwt_payload::SdObjectEncoder;
 
 #[test]
 fn test_complex_structure() {
-  // Values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#appendix-A.2
+  // Values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#appendix-A.2
   let object = json!({
     "verified_claims": {
       "verification": {

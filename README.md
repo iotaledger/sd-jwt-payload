@@ -36,7 +36,7 @@
 
 # SD-JWT Reference implementation
 
-Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 06**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html)
+Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 07**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html)
 
 ## Overview
 
