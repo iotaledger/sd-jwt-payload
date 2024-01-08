@@ -84,6 +84,12 @@ impl SdObjectDecoder {
     // Decode the object recursively.
     let mut decoded = self.decode_object(object, &disclosures_map, &mut processed_digests)?;
 
+    if processed_digests.len() != disclosures.len() {
+      return Err(crate::Error::UnusedDisclosures(
+        disclosures.len().saturating_sub(processed_digests.len()),
+      ));
+    }
+
     // Remove `_sd_alg` in case it exists.
     decoded.remove(SD_ALG);
     Ok(decoded)
@@ -139,6 +145,7 @@ impl SdObjectDecoder {
             if output.contains_key(&claim_name) {
               return Err(Error::ClaimCollisionError(claim_name));
             }
+            processed_digests.push(digest_str.clone());
 
             let recursively_decoded = match disclosure.claim_value {
               Value::Array(ref sub_arr) => Value::Array(self.decode_array(sub_arr, disclosures, processed_digests)?),
@@ -199,11 +206,11 @@ impl SdObjectDecoder {
             if processed_digests.contains(&digest_in_array) {
               return Err(Error::DuplicateDigestError(digest_in_array));
             }
-
             if let Some(disclosure) = disclosures.get(&digest_in_array) {
               if disclosure.claim_name.is_some() {
                 return Err(Error::InvalidDisclosure("array length must be 2".to_string()));
               }
+              processed_digests.push(digest_in_array.clone());
               // Recursively decoded the disclosed values.
               let recursively_decoded = match disclosure.claim_value {
                 Value::Array(ref sub_arr) => {
@@ -245,6 +252,7 @@ impl Default for SdObjectDecoder {
 
 #[cfg(test)]
 mod test {
+  use crate::Disclosure;
   use crate::Error;
   use crate::SdObjectDecoder;
   use crate::SdObjectEncoder;
@@ -280,5 +288,49 @@ mod test {
     let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
+  }
+
+  #[test]
+  fn duplicate_digest() {
+    let object = json!({
+      "id": "did:value",
+    });
+    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    let dislosure: Disclosure = encoder.conceal(&["id"], Some("test".to_string())).unwrap();
+    // 'obj' contains digest of `id` twice.
+    let obj = json!({
+      "_sd":[
+        "mcKLMnXQdCM0gJ5l4Hb6ignpVgCw4SfienkI8vFgpjE",
+        "mcKLMnXQdCM0gJ5l4Hb6ignpVgCw4SfienkI8vFgpjE"
+      ]
+      }
+    );
+    let decoder = SdObjectDecoder::new_with_sha256();
+    let result = decoder.decode(obj.as_object().unwrap(), &vec![dislosure.to_string()]);
+    assert!(matches!(result.err().unwrap(), crate::Error::DuplicateDigestError(_)));
+  }
+
+  #[test]
+  fn unused_disclosure() {
+    let object = json!({
+      "id": "did:value",
+      "tst": "tst-value"
+    });
+    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+    let disclosure_1: Disclosure = encoder.conceal(&["id"], Some("test".to_string())).unwrap();
+    let disclosure_2: Disclosure = encoder.conceal(&["tst"], Some("test".to_string())).unwrap();
+    // 'obj' contains only the digest of `id`.
+    let obj = json!({
+      "_sd":[
+        "mcKLMnXQdCM0gJ5l4Hb6ignpVgCw4SfienkI8vFgpjE",
+      ]
+      }
+    );
+    let decoder = SdObjectDecoder::new_with_sha256();
+    let result = decoder.decode(
+      obj.as_object().unwrap(),
+      &vec![disclosure_1.to_string(), disclosure_2.to_string()],
+    );
+    assert!(matches!(result.err().unwrap(), crate::Error::UnusedDisclosures(1)));
   }
 }
