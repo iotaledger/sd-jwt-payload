@@ -35,18 +35,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     ]
   });
 
-  let mut disclosures: Vec<Disclosure> = vec![];
   let mut encoder: SdObjectEncoder = object.try_into()?;
-  let disclosure = encoder.conceal(&["email"], None)?;
-  disclosures.push(disclosure);
-  let disclosure = encoder.conceal(&["phone_number"], None)?;
-  disclosures.push(disclosure);
-  let disclosure = encoder.conceal(&["address", "street_address"], None)?;
-  disclosures.push(disclosure);
-  let disclosure = encoder.conceal(&["address"], None)?;
-  disclosures.push(disclosure);
-  let disclosure = encoder.conceal_array_entry(&["nationalities"], 0, None)?;
-  disclosures.push(disclosure);
+  let disclosures: Vec<Disclosure> = vec![
+    encoder.conceal(&["email"], None)?,
+    encoder.conceal(&["phone_number"], None)?,
+    encoder.conceal(&["address", "street_address"], None)?,
+    encoder.conceal(&["address"], None)?,
+    encoder.conceal_array_entry(&["nationalities"], 0, None)?,
+  ];
   encoder.add_sd_alg_property();
 
   println!("encoded object: {}", serde_json::to_string_pretty(encoder.object())?);
