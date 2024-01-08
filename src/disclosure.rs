@@ -68,7 +68,8 @@ impl Disclosure {
 
     if decoded.len() == 2 {
       Ok(Self {
-        salt: decoded.first()
+        salt: decoded
+          .first()
           .ok_or(Error::InvalidDisclosure("invalid salt".to_string()))?
           .as_str()
           .ok_or(Error::InvalidDisclosure(
@@ -85,7 +86,8 @@ impl Disclosure {
       })
     } else if decoded.len() == 3 {
       Ok(Self {
-        salt: decoded.first()
+        salt: decoded
+          .first()
           .ok_or(Error::InvalidDisclosure("invalid salt".to_string()))?
           .as_str()
           .ok_or(Error::InvalidDisclosure(
