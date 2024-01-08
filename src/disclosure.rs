@@ -10,7 +10,7 @@ use std::fmt::Display;
 /// Represents an elements constructing a disclosure.
 /// Object properties and array elements disclosures are supported.
 ///
-/// See: https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#name-disclosures
+/// See: https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#name-disclosures
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Disclosure {
   /// The salt value.
@@ -69,7 +69,7 @@ impl Disclosure {
     if decoded.len() == 2 {
       Ok(Self {
         salt: decoded
-          .get(0)
+          .first()
           .ok_or(Error::InvalidDisclosure("invalid salt".to_string()))?
           .as_str()
           .ok_or(Error::InvalidDisclosure(
@@ -87,7 +87,7 @@ impl Disclosure {
     } else if decoded.len() == 3 {
       Ok(Self {
         salt: decoded
-          .get(0)
+          .first()
           .ok_or(Error::InvalidDisclosure("invalid salt".to_string()))?
           .as_str()
           .ok_or(Error::InvalidDisclosure(
@@ -140,7 +140,7 @@ mod test {
   use super::Disclosure;
 
   // Test values from:
-  // https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.html#appendix-A.2-7
+  // https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#appendix-A.2-7
   #[test]
   fn test_parsing() {
     let disclosure = Disclosure::new(

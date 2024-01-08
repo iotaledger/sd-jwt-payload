@@ -39,4 +39,7 @@ pub enum Error {
 
   #[error("salt size must be greater than or equal to 16")]
   InvalidSaltSize,
+
+  #[error("the validation ended with {0} unused disclosure(s)")]
+  UnusedDisclosures(usize),
 }
