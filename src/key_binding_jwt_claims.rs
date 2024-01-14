@@ -1,15 +1,12 @@
-// Copyright 2020-2023 IOTA Stiftung
+// Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-use std::time::SystemTime;
-
-use itertools::Itertools;
-use serde_json::Value;
-
 use crate::Hasher;
+use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 /// Claims set for key binding JWT.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -26,27 +23,10 @@ impl KeyBindingJwtClaims {
   pub const KB_JWT_HEADER_TYP: &'static str = " kb+jwt";
 
   /// Creates a new [`KeyBindingJwtClaims`].
-  /// When `issued_at` is left as None, it will automatically default to the current time.
-  ///
-  /// # Panic
-  /// When `issued_at` is set to `None` and the system returns time earlier than `SystemTime::UNIX_EPOCH`.
-  pub fn new(
-    hasher: &dyn Hasher,
-    jwt: String,
-    disclosures: Vec<String>,
-    nonce: String,
-    aud: String,
-    issued_at: Option<i64>,
-  ) -> Self {
+  pub fn new(hasher: &dyn Hasher, jwt: String, disclosures: Vec<String>, nonce: String, aud: String, iat: i64) -> Self {
     let disclosures = disclosures.iter().join("~");
     let sd_jwt = format!("{}~{}~", jwt, disclosures);
     let hash = hasher.encoded_digest(&sd_jwt);
-    let iat = issued_at.unwrap_or(
-      SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("system time error")
-        .as_secs() as i64,
-    );
     Self {
       iat,
       aud,
