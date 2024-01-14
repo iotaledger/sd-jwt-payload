@@ -54,7 +54,7 @@ Include the library in your `cargo.toml`.
 
 ```bash
 [dependencies]
-sd-jwt-payload = { version = "0.1.1" }
+sd-jwt-payload = { version = "0.1.2" }
 ```
 
 ## Examples
