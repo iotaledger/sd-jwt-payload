@@ -37,11 +37,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let mut encoder: SdObjectEncoder = object.try_into()?;
   let disclosures: Vec<Disclosure> = vec![
-    encoder.conceal(&["email"], None)?,
-    encoder.conceal(&["phone_number"], None)?,
-    encoder.conceal(&["address", "street_address"], None)?,
-    encoder.conceal(&["address"], None)?,
-    encoder.conceal_array_entry(&["nationalities"], 0, None)?,
+    encoder.conceal("/email", None)?,
+    encoder.conceal("phone_number", None)?,
+    encoder.conceal("address/street_address", None)?,
+    encoder.conceal("address", None)?,
+    encoder.conceal(&"nationalities/0", None)?,
   ];
   encoder.add_sd_alg_property();
 
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   header.set_token_type("sd-jwt");
 
   // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object().clone())?;
+  let payload = JwtPayload::from_map(encoder.object().as_object().unwrap().clone())?;
   let key = b"0123456789ABCDEF0123456789ABCDEF";
   let signer = HS256.signer_from_bytes(key)?;
   let jwt = jwt::encode_with_signer(&payload, &header, &signer)?;

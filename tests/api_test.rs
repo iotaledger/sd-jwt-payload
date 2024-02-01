@@ -70,22 +70,22 @@ fn test_complex_structure() {
 
   let mut disclosures: Vec<Disclosure> = vec![];
   let mut encoder = SdObjectEncoder::try_from(object.clone()).unwrap();
-  let disclosure = encoder.conceal(&["verified_claims", "verification", "time"], None);
+  let disclosure = encoder.conceal("/verified_claims/verification/time", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal_array_entry(&["verified_claims", "verification", "evidence"], 0, None);
+  let disclosure = encoder.conceal("/verified_claims/verification/evidence/0", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal_array_entry(&["verified_claims", "verification", "evidence"], 1, None);
+  let disclosure = encoder.conceal("/verified_claims/verification/evidence/1", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal(&["verified_claims", "verification", "evidence"], None);
+  let disclosure = encoder.conceal("/verified_claims/verification/evidence", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal(&["verified_claims", "claims", "place_of_birth", "locality"], None);
+  let disclosure = encoder.conceal("/verified_claims/claims/place_of_birth/locality", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal(&["verified_claims", "claims"], None);
+  let disclosure = encoder.conceal("/verified_claims/claims", None);
   disclosures.push(disclosure.unwrap());
 
   println!(
@@ -98,7 +98,7 @@ fn test_complex_structure() {
   header.set_token_type("SD-JWT");
 
   // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object().clone()).unwrap();
+  let payload = JwtPayload::from_map(encoder.object().as_object().unwrap().clone()).unwrap();
   let key = b"0123456789ABCDEF0123456789ABCDEF";
   let signer = HS256.signer_from_bytes(key).unwrap();
   let jwt = jwt::encode_with_signer(&payload, &header, &signer).unwrap();
@@ -131,7 +131,7 @@ fn concealed_object_in_array() {
     "test1": 123,
   });
   let mut encoder = SdObjectEncoder::try_from(nested_object.clone()).unwrap();
-  let disclosure = encoder.conceal(&["test1"], None);
+  let disclosure = encoder.conceal("/test1", None);
   disclosures.push(disclosure.unwrap());
 
   let object = json!({
@@ -150,9 +150,9 @@ fn concealed_object_in_array() {
         ]
   });
   let mut encoder = SdObjectEncoder::try_from(object.clone()).unwrap();
-  let disclosure = encoder.conceal_array_entry(&["test2"], 0, None);
+  let disclosure = encoder.conceal("/test2/0", None);
   disclosures.push(disclosure.unwrap());
-  let disclosure = encoder.conceal(&["test2"], None);
+  let disclosure = encoder.conceal("test2", None);
   disclosures.push(disclosure.unwrap());
 
   let disclosures: Vec<String> = disclosures
@@ -160,7 +160,9 @@ fn concealed_object_in_array() {
     .map(|disclosure| disclosure.to_string())
     .collect();
   let decoder = SdObjectDecoder::new_with_sha256();
-  let decoded = decoder.decode(encoder.object(), &disclosures).unwrap();
+  let decoded = decoder
+    .decode(encoder.object().as_object().unwrap(), &disclosures)
+    .unwrap();
   assert_eq!(Value::Object(decoded), expected);
 }
 
