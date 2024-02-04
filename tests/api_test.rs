@@ -1,4 +1,4 @@
-// Copyright 2020-2023 IOTA Stiftung
+// Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
 use josekit::jws::JwsAlgorithm;
@@ -73,7 +73,7 @@ fn test_complex_structure() {
   let disclosure = encoder.conceal("/verified_claims/verification/time", None);
   disclosures.push(disclosure.unwrap());
 
-  let disclosure = encoder.conceal("/verified_claims/verification/evidence/0", None);
+  let disclosure = encoder.conceal("/verified_claims/verification/evidence/0/document/type", None);
   disclosures.push(disclosure.unwrap());
 
   let disclosure = encoder.conceal("/verified_claims/verification/evidence/1", None);
@@ -90,7 +90,7 @@ fn test_complex_structure() {
 
   println!(
     "encoded object: {}",
-    serde_json::to_string_pretty(&encoder.object()).unwrap()
+    serde_json::to_string_pretty(&encoder.object().unwrap()).unwrap()
   );
   // Create the JWT.
   // Creating JWTs is out of the scope of this library, josekit is used here as an example
@@ -98,7 +98,7 @@ fn test_complex_structure() {
   header.set_token_type("SD-JWT");
 
   // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object().as_object().unwrap().clone()).unwrap();
+  let payload = JwtPayload::from_map(encoder.object().unwrap().clone()).unwrap();
   let key = b"0123456789ABCDEF0123456789ABCDEF";
   let signer = HS256.signer_from_bytes(key).unwrap();
   let jwt = jwt::encode_with_signer(&payload, &header, &signer).unwrap();
@@ -119,6 +119,11 @@ fn test_complex_structure() {
 
   // Decode the payload by providing the disclosures that were parsed from the SD-JWT.
   let decoder = SdObjectDecoder::new_with_sha256();
+
+  println!(
+    "claims: {}",
+    serde_json::to_string_pretty(payload.claims_set()).unwrap()
+  );
   let decoded = decoder.decode(payload.claims_set(), &sd_jwt.disclosures).unwrap();
   println!("decoded object: {}", serde_json::to_string_pretty(&decoded).unwrap());
   assert_eq!(Value::Object(decoded), object);
@@ -137,7 +142,7 @@ fn concealed_object_in_array() {
   let object = json!({
         "test2": [
           "value1",
-          encoder.object()
+          encoder.object().unwrap()
         ]
   });
 
@@ -152,7 +157,7 @@ fn concealed_object_in_array() {
   let mut encoder = SdObjectEncoder::try_from(object.clone()).unwrap();
   let disclosure = encoder.conceal("/test2/0", None);
   disclosures.push(disclosure.unwrap());
-  let disclosure = encoder.conceal("test2", None);
+  let disclosure = encoder.conceal("/test2", None);
   disclosures.push(disclosure.unwrap());
 
   let disclosures: Vec<String> = disclosures
@@ -160,9 +165,7 @@ fn concealed_object_in_array() {
     .map(|disclosure| disclosure.to_string())
     .collect();
   let decoder = SdObjectDecoder::new_with_sha256();
-  let decoded = decoder
-    .decode(encoder.object().as_object().unwrap(), &disclosures)
-    .unwrap();
+  let decoded = decoder.decode(encoder.object().unwrap(), &disclosures).unwrap();
   assert_eq!(Value::Object(decoded), expected);
 }
 

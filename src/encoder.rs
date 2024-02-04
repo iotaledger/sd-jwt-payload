@@ -17,6 +17,7 @@ pub(crate) const DIGESTS_KEY: &str = "_sd";
 pub(crate) const ARRAY_DIGEST_KEY: &str = "...";
 pub(crate) const DEFAULT_SALT_SIZE: usize = 30;
 pub(crate) const SD_ALG: &str = "_sd_alg";
+pub const HEADER_TYP: &str = "sd-jwt";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
@@ -52,8 +53,13 @@ impl SdObjectEncoder {
   /// ## Error
   /// Returns [`Error::DeserializationError`] if `object` is not a valid JSON object.
   pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
+    let object: Value = serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+    if !object.is_object() {
+      return Err(Error::DataTypeMismatch("expected object".to_owned()));
+    }
+
     Ok(SdObjectEncoder {
-      object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
+      object,
       salt_size: DEFAULT_SALT_SIZE,
       hasher: Sha256Hasher::new(),
     })
@@ -64,42 +70,74 @@ impl SdObjectEncoder {
   /// ## Error
   /// Returns [`Error::DeserializationError`] if `object` can not be serialized into a valid JSON object.
   pub fn try_from_serializable<T: serde::Serialize>(object: T) -> std::result::Result<Self, crate::Error> {
-    let value: String = serde_json::to_string(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
-    Self::new(&value)
+    let object: Value = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+    SdObjectEncoder::try_from(object)
   }
 }
 
 #[cfg(feature = "sha")]
 impl TryFrom<Value> for SdObjectEncoder {
   type Error = crate::Error;
-
   fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
-    match value.clone() {
-      Value::Object(_) => Ok(SdObjectEncoder {
-        salt_size: DEFAULT_SALT_SIZE,
-        hasher: Sha256Hasher::new(),
-        object: value,
-      }),
-      _ => Err(Error::DataTypeMismatch("expected object".to_owned())),
+    if !value.is_object() {
+      return Err(Error::DataTypeMismatch("expected object".to_owned()));
     }
+
+    Ok(SdObjectEncoder {
+      object: value,
+      salt_size: DEFAULT_SALT_SIZE,
+      hasher: Sha256Hasher::new(),
+    })
   }
 }
 
 impl<H: Hasher> SdObjectEncoder<H> {
   /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests.
   pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
+    let object: Value = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+    if !object.is_object() {
+      return Err(Error::DataTypeMismatch("expected object".to_owned()));
+    }
     Ok(Self {
-      object: serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?,
+      object,
       salt_size: DEFAULT_SALT_SIZE,
       hasher,
     })
   }
 
-  pub fn conceal(&mut self, pointer: &str, salt: Option<String>) -> Result<Disclosure> {
+  /// Substitutes a value with the digest of its disclosure.
+  /// If no salt is provided, the disclosure will be created with a random salt value.
+  ///
+  /// `path` indicates the pointer to the value that will be concealed using the syntax of
+  /// [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+  ///
+  ///
+  /// ## Example
+  ///  ```
+  ///  use sd_jwt_payload::SdObjectEncoder;
+  ///  use sd_jwt_payload::json;
+  ///
+  ///  let obj = json!({
+  ///   "id": "did:value",
+  ///   "claim1": {
+  ///      "abc": true
+  ///   },
+  ///   "claim2": ["val_1", "val_2"]
+  /// });
+  /// let mut encoder = SdObjectEncoder::try_from(obj).unwrap();
+  /// encoder.conceal("/id", None).unwrap(); //conceals "id": "did:value"
+  /// encoder.conceal("/claim1/abc", None).unwrap(); //"abc": true
+  /// encoder.conceal("/claim2/0", None).unwrap(); //conceals "val_1"
+  /// ```
+  ///
+  /// ## Error
+  /// * [`Error::InvalidPath`] if pointer is invalid.
+  /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.
+  pub fn conceal(&mut self, path: &str, salt: Option<String>) -> Result<Disclosure> {
     // Determine salt.
     let salt = salt.unwrap_or(Self::gen_rand(self.salt_size));
 
-    let element_pointer = pointer
+    let element_pointer = path
       .parse::<JsonPointer<_, _>>()
       .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
 
@@ -168,7 +206,11 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Adds a decoy digest to the specified path.
-  /// If path is an empty slice, decoys will be added to the top level.
+  ///
+  /// `path` indicates the pointer to the value that will be concealed using the syntax of
+  /// [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+  ///
+  /// Use `path` = "" to add decoys to the top level.
   pub fn add_decoys(&mut self, path: &str, number_of_decoys: usize) -> Result<()> {
     for _ in 0..number_of_decoys {
       self.add_decoy(path)?;
@@ -242,15 +284,12 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Returns a reference to the internal object.
-  pub fn object(&self) -> &Value {
-    &self.object
+  pub fn object(&self) -> Result<&Map<String, Value>> {
+    // Safety: encoder can be constructed from objects only.
+    self.object.as_object().ok_or(Error::DataTypeMismatch(
+      "encoder initialized with invalid JSON object".to_string(),
+    ))
   }
-
-  /// Returns a mutable reference to the internal object.
-  // #[cfg(test)]
-  // pub(crate) fn object_mut(&mut self) -> &mut Map<String, Value> {
-  //   &mut self.value.as_object_mut()
-  // }
 
   /// Returns the used salt length.
   pub fn salt_size(&self) -> usize {
@@ -276,7 +315,6 @@ mod test {
 
   use super::SdObjectEncoder;
   use crate::Error;
-  use json_pointer::JsonPointer;
   use serde::Serialize;
   use serde_json::json;
   use serde_json::Value;
@@ -302,9 +340,9 @@ mod test {
     let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
     encoder.conceal("/claim1/abc", None).unwrap();
     encoder.conceal("/id", None).unwrap();
-    encoder.add_decoys("/", 10).unwrap();
+    encoder.add_decoys("", 10).unwrap();
     encoder.add_decoys("/claim2", 10).unwrap();
-    assert!(encoder.object().get("id").is_none());
+    assert!(encoder.object().unwrap().get("id").is_none());
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
     assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
   }
@@ -340,8 +378,8 @@ mod test {
     };
     let mut encoder = SdObjectEncoder::try_from_serializable(test_value).unwrap();
     encoder.conceal("/id", None).unwrap();
-    encoder.add_decoys("/", 10).unwrap();
-    encoder.add_decoys("claim2", 10).unwrap();
+    encoder.add_decoys("", 10).unwrap();
+    encoder.add_decoys("/claim2", 10).unwrap();
     assert!(encoder.object.get("id").is_none());
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
     assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);

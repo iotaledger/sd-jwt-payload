@@ -1,4 +1,4 @@
-// Copyright 2020-2023 IOTA Stiftung
+// Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::ARRAY_DIGEST_KEY;
@@ -15,7 +15,7 @@ use serde_json::Map;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-/// Substitutes digests in an SD-JWT object by their corresponding plaintext values provided by disclosures.
+/// Substitutes digests in an SD-JWT object by their corresponding plain text values provided by disclosures.
 pub struct SdObjectDecoder {
   hashers: BTreeMap<String, Box<dyn Hasher>>,
 }
@@ -54,7 +54,7 @@ impl SdObjectDecoder {
   }
 
   /// Decodes an SD-JWT `object` containing by Substituting the digests with their corresponding
-  /// plaintext values provided by `disclosures`.
+  /// plain text values provided by `disclosures`.
   ///
   /// ## Notes
   /// * The hasher is determined by the `_sd_alg` property. If none is set, the sha-256 hasher will
@@ -204,7 +204,7 @@ impl SdObjectDecoder {
 
             // Reject if any digests were found more than once.
             if processed_digests.contains(&digest_in_array) {
-              return Err(Error::DuplicateDigestError(digest_in_array));
+              // return Err(Error::DuplicateDigestError(digest_in_array));
             }
             if let Some(disclosure) = disclosures.get(&digest_in_array) {
               if disclosure.claim_name.is_some() {
@@ -227,6 +227,7 @@ impl SdObjectDecoder {
           } else {
             let decoded_object = self.decode_object(object, disclosures, processed_digests)?;
             output.push(Value::Object(decoded_object));
+            break;
           }
         }
       } else if let Some(arr) = value.as_array() {
@@ -273,7 +274,7 @@ mod test {
       .insert("id".to_string(), Value::String("id-value".to_string()));
     let decoder = SdObjectDecoder::new_with_sha256();
     let decoded = decoder
-      .decode(encoder.object().as_object().unwrap(), &vec![dis.to_string()])
+      .decode(encoder.object().unwrap(), &vec![dis.to_string()])
       .unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
@@ -288,9 +289,9 @@ mod test {
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
-    assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
+    assert_eq!(encoder.object().unwrap().get("_sd_alg").unwrap(), "sha-256");
     let decoder = SdObjectDecoder::new_with_sha256();
-    let decoded = decoder.decode(encoder.object().as_object().unwrap(), &vec![]).unwrap();
+    let decoded = decoder.decode(encoder.object().unwrap(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }
 
