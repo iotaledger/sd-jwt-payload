@@ -94,7 +94,7 @@ impl TryFrom<Value> for SdObjectEncoder {
 impl<H: Hasher> SdObjectEncoder<H> {
   /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests.
   pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
-    let object: Value = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+    let object: Value = serde_json::to_value(object).map_err(|e| Error::DeserializationError(e.to_string()))?;
     if !object.is_object() {
       return Err(Error::DataTypeMismatch("expected object".to_owned()));
     }
@@ -129,7 +129,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// encoder.conceal("/claim1/abc", None).unwrap(); //"abc": true
   /// encoder.conceal("/claim2/0", None).unwrap(); //conceals "val_1"
   /// ```
-  ///
+  /// 
   /// ## Error
   /// * [`Error::InvalidPath`] if pointer is invalid.
   /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.
