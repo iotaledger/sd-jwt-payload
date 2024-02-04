@@ -148,7 +148,6 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
     let parent = parent_pointer
       .get(&self.object)
-      // .map_err(|err| Error::InvalidPath("specified path does not match a json value".to_string()))?;
       .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
 
     match parent {
