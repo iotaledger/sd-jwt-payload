@@ -204,7 +204,7 @@ impl SdObjectDecoder {
 
             // Reject if any digests were found more than once.
             if processed_digests.contains(&digest_in_array) {
-              // return Err(Error::DuplicateDigestError(digest_in_array));
+              return Err(Error::DuplicateDigestError(digest_in_array));
             }
             if let Some(disclosure) = disclosures.get(&digest_in_array) {
               if disclosure.claim_name.is_some() {
