@@ -1,4 +1,4 @@
-// Copyright 2020-2023 IOTA Stiftung
+// Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::ARRAY_DIGEST_KEY;
@@ -15,7 +15,7 @@ use serde_json::Map;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-/// Substitutes digests in an SD-JWT object by their corresponding plaintext values provided by disclosures.
+/// Substitutes digests in an SD-JWT object by their corresponding plain text values provided by disclosures.
 pub struct SdObjectDecoder {
   hashers: BTreeMap<String, Box<dyn Hasher>>,
 }
@@ -54,7 +54,7 @@ impl SdObjectDecoder {
   }
 
   /// Decodes an SD-JWT `object` containing by Substituting the digests with their corresponding
-  /// plaintext values provided by `disclosures`.
+  /// plain text values provided by `disclosures`.
   ///
   /// ## Notes
   /// * The hasher is determined by the `_sd_alg` property. If none is set, the sha-256 hasher will
@@ -227,6 +227,7 @@ impl SdObjectDecoder {
           } else {
             let decoded_object = self.decode_object(object, disclosures, processed_digests)?;
             output.push(Value::Object(decoded_object));
+            break;
           }
         }
       } else if let Some(arr) = value.as_array() {
@@ -265,12 +266,16 @@ mod test {
       "id": "did:value",
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
-    let dis = encoder.conceal(&["id"], None).unwrap();
+    let dis = encoder.conceal("/id", None).unwrap();
     encoder
-      .object_mut()
+      .object
+      .as_object_mut()
+      .unwrap()
       .insert("id".to_string(), Value::String("id-value".to_string()));
     let decoder = SdObjectDecoder::new_with_sha256();
-    let decoded = decoder.decode(encoder.object(), &vec![dis.to_string()]).unwrap_err();
+    let decoded = decoder
+      .decode(encoder.object().unwrap(), &vec![dis.to_string()])
+      .unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
 
@@ -284,9 +289,9 @@ mod test {
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
-    assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
+    assert_eq!(encoder.object().unwrap().get("_sd_alg").unwrap(), "sha-256");
     let decoder = SdObjectDecoder::new_with_sha256();
-    let decoded = decoder.decode(encoder.object(), &vec![]).unwrap();
+    let decoded = decoder.decode(encoder.object().unwrap(), &vec![]).unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }
 
@@ -296,7 +301,7 @@ mod test {
       "id": "did:value",
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
-    let dislosure: Disclosure = encoder.conceal(&["id"], Some("test".to_string())).unwrap();
+    let dislosure: Disclosure = encoder.conceal("/id", Some("test".to_string())).unwrap();
     // 'obj' contains digest of `id` twice.
     let obj = json!({
       "_sd":[
@@ -317,8 +322,8 @@ mod test {
       "tst": "tst-value"
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
-    let disclosure_1: Disclosure = encoder.conceal(&["id"], Some("test".to_string())).unwrap();
-    let disclosure_2: Disclosure = encoder.conceal(&["tst"], Some("test".to_string())).unwrap();
+    let disclosure_1: Disclosure = encoder.conceal("/id", Some("test".to_string())).unwrap();
+    let disclosure_2: Disclosure = encoder.conceal("/tst", Some("test".to_string())).unwrap();
     // 'obj' contains only the digest of `id`.
     let obj = json!({
       "_sd":[

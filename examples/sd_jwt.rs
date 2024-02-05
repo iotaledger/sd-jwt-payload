@@ -1,4 +1,4 @@
-// Copyright 2020-2023 IOTA Stiftung
+// Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
 use std::error::Error;
@@ -11,6 +11,7 @@ use sd_jwt_payload::Disclosure;
 use sd_jwt_payload::SdJwt;
 use sd_jwt_payload::SdObjectDecoder;
 use sd_jwt_payload::SdObjectEncoder;
+use sd_jwt_payload::HEADER_TYP;
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -37,23 +38,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let mut encoder: SdObjectEncoder = object.try_into()?;
   let disclosures: Vec<Disclosure> = vec![
-    encoder.conceal(&["email"], None)?,
-    encoder.conceal(&["phone_number"], None)?,
-    encoder.conceal(&["address", "street_address"], None)?,
-    encoder.conceal(&["address"], None)?,
-    encoder.conceal_array_entry(&["nationalities"], 0, None)?,
+    encoder.conceal("/email", None)?,
+    encoder.conceal("/phone_number", None)?,
+    encoder.conceal("/address/street_address", None)?,
+    encoder.conceal("/address", None)?,
+    encoder.conceal("/nationalities/0", None)?,
   ];
+
+  encoder.add_decoys("/nationalities", 3)?;
+  encoder.add_decoys("", 4)?; // Add decoys to the top level.
+
   encoder.add_sd_alg_property();
 
-  println!("encoded object: {}", serde_json::to_string_pretty(encoder.object())?);
+  println!("encoded object: {}", serde_json::to_string_pretty(encoder.object()?)?);
 
   // Create the JWT.
   // Creating JWTs is outside the scope of this library, josekit is used here as an example.
   let mut header = JwsHeader::new();
-  header.set_token_type("sd-jwt");
+  header.set_token_type(HEADER_TYP);
 
   // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object().clone())?;
+  let payload = JwtPayload::from_map(encoder.object()?.clone())?;
   let key = b"0123456789ABCDEF0123456789ABCDEF";
   let signer = HS256.signer_from_bytes(key)?;
   let jwt = jwt::encode_with_signer(&payload, &header, &signer)?;

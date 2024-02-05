@@ -31,9 +31,6 @@ pub enum Error {
   #[error("invalid input")]
   DeserializationError(String),
 
-  #[error("index {0} is out of bounds for the provided array")]
-  IndexOutofBounds(usize),
-
   #[error("{0}")]
   Unspecified(String),
 

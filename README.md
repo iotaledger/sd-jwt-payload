@@ -54,7 +54,7 @@ Include the library in your `cargo.toml`.
 
 ```bash
 [dependencies]
-sd-jwt-payload = { version = "0.1.2" }
+sd-jwt-payload = { version = "0.2.0" }
 ```
 
 ## Examples
@@ -93,18 +93,19 @@ Any JSON object can be encoded
 
 
 ```rust
-  let mut encoder = SdObjectEncoder::try_from(object).unwrap();
+  let mut encoder: SdObjectEncoder = object.try_into()?;
 ```
 This creates a stateful encoder with `Sha-256` hash function by default to create disclosure digests. 
 
 *Note: `SdObjectEncoder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-The encoder can encode any of the object's values or any array element, using the `conceal` and `conceal_array_entry` methods respectively. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
+The encoder can encode any of the object's values or array elements, using the `conceal` method. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
+
 
 ```rust
-  let disclosure1 = encoder.conceal(&["address", "street_address"], None).unwrap();
-  let disclosure2 = encoder.conceal(&["address"], None).unwrap();
-  let disclosure3 = encoder.conceal_array_entry(&["phone"], 0, None).unwrap();
+  let disclosure1 = encoder.conceal("/address/street_address"], None)?;
+  let disclosure2 = encoder.conceal("/address", None)?;
+  let disclosure3 = encoder.conceal("/phone/0", None)?;
 ```
 
 ```
@@ -112,11 +113,14 @@ The encoder can encode any of the object's values or any array element, using th
 "WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0"
 "WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd"
 ```
+*Note: the `conceal` method takes a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) to determine the element to conceal inside the JSON object.*
+
+
 The encoder also supports adding decoys. For instance, the amount of phone numbers and the amount of claims need to be hidden.
 
 ```rust
-  encoder.add_decoys(&["phone"], 3).unwrap(); //Adds 3 decoys to the array `phone`.
-  encoder.add_decoys(&[], 6).unwrap(); // Adds 6 decoys to the top level object.
+  encoder.add_decoys("/phone", 3).unwrap(); //Adds 3 decoys to the array `phone`.
+  encoder.add_decoys("", 6).unwrap(); // Adds 6 decoys to the top level object.
 ```
 
 Add the hash function claim.
@@ -124,7 +128,7 @@ Add the hash function claim.
   encoder.add_sd_alg_property(); // This adds "_sd_alg": "sha-256"
 ```
 
-Now `encoder.object()` will return the encoded object.
+Now `encoder.object()?` will return the encoded object.
 
 ```json
 {
@@ -182,10 +186,10 @@ Parse the SD-JWT string to extract the JWT and the disclosures in order to decod
 *Note: Validating the signature of the JWT and extracting the claim set is outside the scope of this library.
 
 ```rust
-  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string).unwrap();
+  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string)?;
   let claims_set: // extract claims from `sd_jwt.jwt`.
   let decoder = SdObjectDecoder::new();
-  let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures).unwrap();
+  let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures)?;
 ```
 `decoded_object`:
 
