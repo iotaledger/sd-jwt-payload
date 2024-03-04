@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::fmt::Display;
+use std::str::FromStr;
 
 use crate::Error;
 use crate::Result;
 use itertools::Itertools;
-use serde::Deserialize;
-use serde::Serialize;
+use serde_with::DeserializeFromStr;
+use serde_with::SerializeDisplay;
 
 /// Representation of an SD-JWT of the format
 /// `<Issuer-signed JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>`.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, SerializeDisplay, DeserializeFromStr)]
 pub struct SdJwt {
   /// The JWT part.
   pub jwt: String,
@@ -77,6 +78,13 @@ impl SdJwt {
 impl Display for SdJwt {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.write_str(&(self.presentation()))
+  }
+}
+
+impl FromStr for SdJwt {
+  type Err = Error;
+  fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    Self::parse(s)
   }
 }
 
