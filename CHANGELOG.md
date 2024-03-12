@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.2.1]
+
+### Added
+- Added `FromStr` implementation for `SdJwt`.
+
+### Removed
+- Removed `Serialize` and `Deserialize` implementation for `SdJwt`.
+
 ## [0.2.0]
 
 ### Added
