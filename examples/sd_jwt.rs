@@ -3,18 +3,39 @@
 
 use std::error::Error;
 
+use async_trait::async_trait;
+use josekit::jws::alg::hmac::HmacJwsSigner;
 use josekit::jws::JwsHeader;
 use josekit::jws::HS256;
 use josekit::jwt::JwtPayload;
 use josekit::jwt::{self};
-use sd_jwt_payload::Disclosure;
-use sd_jwt_payload::SdJwt;
-use sd_jwt_payload::SdObjectDecoder;
-use sd_jwt_payload::SdObjectEncoder;
-use sd_jwt_payload::HEADER_TYP;
+use sd_jwt_payload::JsonObject;
+use sd_jwt_payload::JwsSigner;
+use sd_jwt_payload::SdJwtBuilder;
 use serde_json::json;
 
-fn main() -> Result<(), Box<dyn Error>> {
+struct HmacSignerAdapter(HmacJwsSigner);
+
+#[async_trait]
+impl JwsSigner for HmacSignerAdapter {
+  type Error = josekit::JoseError;
+  async fn sign(&self, header: &JsonObject, payload: &JsonObject) -> Result<Vec<u8>, Self::Error> {
+    let header = JwsHeader::from_map(header.clone())?;
+    let payload = JwtPayload::from_map(payload.clone())?;
+    let jwt = jwt::encode_with_signer(&payload, &header, &self.0)?;
+    let sig_bytes = jwt
+      .split('.')
+      .nth(2)
+      .map(|sig| multibase::Base::Base64Url.decode(sig))
+      .unwrap()
+      .unwrap();
+
+    Ok(sig_bytes)
+  }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
   let object = json!({
     "sub": "user_42",
     "given_name": "John",
@@ -36,50 +57,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     ]
   });
 
-  let mut encoder: SdObjectEncoder = object.try_into()?;
-  let disclosures: Vec<Disclosure> = vec![
-    encoder.conceal("/email", None)?,
-    encoder.conceal("/phone_number", None)?,
-    encoder.conceal("/address/street_address", None)?,
-    encoder.conceal("/address", None)?,
-    encoder.conceal("/nationalities/0", None)?,
-  ];
-
-  encoder.add_decoys("/nationalities", 3)?;
-  encoder.add_decoys("", 4)?; // Add decoys to the top level.
-
-  encoder.add_sd_alg_property();
-
-  println!("encoded object: {}", serde_json::to_string_pretty(encoder.object()?)?);
-
-  // Create the JWT.
-  // Creating JWTs is outside the scope of this library, josekit is used here as an example.
-  let mut header = JwsHeader::new();
-  header.set_token_type(HEADER_TYP);
-
-  // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object()?.clone())?;
   let key = b"0123456789ABCDEF0123456789ABCDEF";
-  let signer = HS256.signer_from_bytes(key)?;
-  let jwt = jwt::encode_with_signer(&payload, &header, &signer)?;
+  let signer = HmacSignerAdapter(HS256.signer_from_bytes(key)?);
+  let mut sd_jwt = SdJwtBuilder::new(object)?
+    .make_concealable("/email")?
+    .make_concealable("/phone_number")?
+    .make_concealable("/address/street_address")?
+    .make_concealable("/address")?
+    .make_concealable("/nationalities/0")?
+    .add_decoys("/nationalities", 1)?
+    .add_decoys("", 2)?
+    .require_key_binding(sd_jwt_payload::RequiredKeyBinding::Kid("key1".to_string()))
+    .finish(&signer, "HS256")
+    .await?;
 
-  // Create an SD_JWT by collecting the disclosures and creating an `SdJwt` instance.
-  let disclosures: Vec<String> = disclosures
-    .into_iter()
-    .map(|disclosure| disclosure.to_string())
-    .collect();
-  let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
-  let sd_jwt: String = sd_jwt.presentation();
+  println!("encoded object: {}", serde_json::to_string_pretty(sd_jwt.claims())?);
 
-  // Decoding the SD-JWT
-  // Extract the payload from the JWT of the SD-JWT after verifying the signature.
-  let sd_jwt: SdJwt = SdJwt::parse(&sd_jwt)?;
-  let verifier = HS256.verifier_from_bytes(key)?;
-  let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &verifier)?;
+  // Issuer sends the SD-JWT with all its disclosures to its holder
+  // The holder decodes the token in order to see all of its properties.
 
-  // Decode the payload by providing the disclosures that were parsed from the SD-JWT.
-  let decoder = SdObjectDecoder::new_with_sha256();
-  let decoded = decoder.decode(payload.claims_set(), &sd_jwt.disclosures)?;
+  let decoded = sd_jwt.decode()?;
   println!("decoded object: {}", serde_json::to_string_pretty(&decoded)?);
+
+  // The holder can withhold from a verifier any conceilable claim by calling `conceal`.
+  sd_jwt.conceal("/email")?;
+  sd_jwt.conceal("/phone_number")?;
+  let concealed_token = sd_jwt.decode()?;
+
+  println!(
+    "presented object with concealed data:\n{}",
+    serde_json::to_string_pretty(&concealed_token)?
+  );
+
   Ok(())
 }

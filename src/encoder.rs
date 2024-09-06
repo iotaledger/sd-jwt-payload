@@ -9,6 +9,7 @@ use crate::Error;
 use crate::Result;
 use json_pointer::JsonPointer;
 use rand::Rng;
+use serde::Serialize;
 use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
@@ -21,22 +22,8 @@ pub const HEADER_TYP: &str = "sd-jwt";
 
 /// Transforms a JSON object into an SD-JWT object by substituting selected values
 /// with their corresponding disclosure digests.
-#[cfg(not(feature = "sha"))]
-pub struct SdObjectEncoder<H: Hasher> {
-  /// The object in JSON format.
-  pub(crate) object: Value,
-  /// Size of random data used to generate the salts for disclosures in bytes.
-  /// Constant length for readability considerations.
-  pub(crate) salt_size: usize,
-  /// The hash function used to create digests.
-  pub(crate) hasher: H,
-}
-
-/// Transforms a JSON object into an SD-JWT object by substituting selected values
-/// with their corresponding disclosure digests.
-#[cfg(feature = "sha")]
 #[derive(Debug, Clone)]
-pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
+pub struct SdObjectEncoder<H> {
   /// The object in JSON format.
   pub(crate) object: Value,
   /// Size of random data used to generate the salts for disclosures in bytes.
@@ -47,66 +34,57 @@ pub struct SdObjectEncoder<H: Hasher = Sha256Hasher> {
 }
 
 #[cfg(feature = "sha")]
-impl SdObjectEncoder {
+impl SdObjectEncoder<Sha256Hasher> {
   /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function.
   ///
   /// ## Error
-  /// Returns [`Error::DeserializationError`] if `object` is not a valid JSON object.
-  pub fn new(object: &str) -> Result<SdObjectEncoder<Sha256Hasher>> {
-    let object: Value = serde_json::from_str(object).map_err(|e| Error::DeserializationError(e.to_string()))?;
-    if !object.is_object() {
-      return Err(Error::DataTypeMismatch("expected object".to_owned()));
-    }
-
-    Ok(SdObjectEncoder {
-      object,
-      salt_size: DEFAULT_SALT_SIZE,
-      hasher: Sha256Hasher::new(),
-    })
+  /// Returns [`Error::DataTypeMismatch`] if `object` is not a valid JSON object.
+  pub fn new(object: Value) -> Result<Self> {
+    Self::try_from(object)
   }
 
   /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function from a serializable object.
   ///
   /// ## Error
   /// Returns [`Error::DeserializationError`] if `object` can not be serialized into a valid JSON object.
-  pub fn try_from_serializable<T: serde::Serialize>(object: T) -> std::result::Result<Self, crate::Error> {
-    let object: Value = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+  pub fn try_from_serializable<T>(object: T) -> Result<Self>
+  where
+    T: Serialize,
+  {
+    let object = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
     SdObjectEncoder::try_from(object)
   }
 }
 
 #[cfg(feature = "sha")]
-impl TryFrom<Value> for SdObjectEncoder {
+impl TryFrom<Value> for SdObjectEncoder<Sha256Hasher> {
   type Error = crate::Error;
-  fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
-    if !value.is_object() {
-      return Err(Error::DataTypeMismatch("expected object".to_owned()));
-    }
-
-    Ok(SdObjectEncoder {
-      object: value,
-      salt_size: DEFAULT_SALT_SIZE,
-      hasher: Sha256Hasher::new(),
-    })
+  fn try_from(value: Value) -> Result<Self> {
+    Self::with_custom_hasher(value, Sha256Hasher::new())
   }
 }
 
 impl<H: Hasher> SdObjectEncoder<H> {
   /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests.
-  pub fn with_custom_hasher(object: &str, hasher: H) -> Result<Self> {
-    let object: Value = serde_json::to_value(object).map_err(|e| Error::DeserializationError(e.to_string()))?;
+  pub fn with_custom_hasher(object: Value, hasher: H) -> Result<Self> {
+    Self::with_custom_hasher_and_salt_size(object, hasher, DEFAULT_SALT_SIZE)
+  }
+  /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests, and custom salt size.
+  pub fn with_custom_hasher_and_salt_size(object: Value, hasher: H, salt_size: usize) -> Result<Self> {
     if !object.is_object() {
-      return Err(Error::DataTypeMismatch("expected object".to_owned()));
-    }
+      return Err(Error::DataTypeMismatch(
+        "argument `object` must be a JSON Object".to_string(),
+      ));
+    };
+
     Ok(Self {
       object,
-      salt_size: DEFAULT_SALT_SIZE,
+      salt_size,
       hasher,
     })
   }
 
   /// Substitutes a value with the digest of its disclosure.
-  /// If no salt is provided, the disclosure will be created with a random salt value.
   ///
   /// `path` indicates the pointer to the value that will be concealed using the syntax of
   /// [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
@@ -125,17 +103,17 @@ impl<H: Hasher> SdObjectEncoder<H> {
   ///   "claim2": ["val_1", "val_2"]
   /// });
   /// let mut encoder = SdObjectEncoder::try_from(obj).unwrap();
-  /// encoder.conceal("/id", None).unwrap(); //conceals "id": "did:value"
-  /// encoder.conceal("/claim1/abc", None).unwrap(); //"abc": true
-  /// encoder.conceal("/claim2/0", None).unwrap(); //conceals "val_1"
+  /// encoder.conceal("/id").unwrap(); //conceals "id": "did:value"
+  /// encoder.conceal("/claim1/abc").unwrap(); //"abc": true
+  /// encoder.conceal("/claim2/0").unwrap(); //conceals "val_1"
   /// ```
   /// 
   /// ## Error
   /// * [`Error::InvalidPath`] if pointer is invalid.
   /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.
-  pub fn conceal(&mut self, path: &str, salt: Option<String>) -> Result<Disclosure> {
+  pub fn conceal(&mut self, path: &str) -> Result<Disclosure> {
     // Determine salt.
-    let salt = salt.unwrap_or(Self::gen_rand(self.salt_size));
+    let salt = Self::gen_rand(self.salt_size);
 
     let element_pointer = path
       .parse::<JsonPointer<_, _>>()
@@ -168,7 +146,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
         );
 
         // Hash the disclosure.
-        let hash = self.hasher.encoded_digest(disclosure.as_str());
+        let hash = self.hasher.encoded_digest(&disclosure.to_string());
 
         // Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
         Self::add_digest_to_object(parent, hash)?;
@@ -177,7 +155,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
       Value::Array(_) => {
         let element = element_pointer.get_mut(&mut self.object).unwrap();
         let disclosure = Disclosure::new(salt, None, element.clone());
-        let hash = self.hasher.encoded_digest(disclosure.as_str());
+        let hash = self.hasher.encoded_digest(&disclosure.to_string());
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});
         *element = tripledot;
         Ok(disclosure)
@@ -190,12 +168,13 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
   /// Adds the `_sd_alg` property to the top level of the object.
   /// The value is taken from the [`crate::Hasher::alg_name`] implementation.
-  pub fn add_sd_alg_property(&mut self) -> Option<Value> {
-    if let Some(object) = self.object.as_object_mut() {
-      object.insert(SD_ALG.to_string(), Value::String(self.hasher.alg_name().to_string()))
-    } else {
-      None // Should be unreachable since the `self.object` is checked to be an object on creation.
-    }
+  pub fn add_sd_alg_property(&mut self) {
+    self
+      .object
+      .as_object_mut()
+      // Safety: `object` is a JSON object.
+      .unwrap()
+      .insert(SD_ALG.to_string(), Value::String(self.hasher.alg_name().to_string()));
   }
 
   /// Returns the modified object as a string.
@@ -217,7 +196,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     Ok(())
   }
 
-  fn add_decoy(&mut self, path: &str) -> Result<Disclosure> {
+  fn add_decoy(&mut self, path: &str) -> Result<()> {
     let mut element_pointer = path
       .parse::<JsonPointer<_, _>>()
       .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
@@ -226,14 +205,14 @@ impl<H: Hasher> SdObjectEncoder<H> {
       .get_mut(&mut self.object)
       .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
     if let Some(object) = value.as_object_mut() {
-      let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
+      let (_, hash) = Self::random_digest(&self.hasher, self.salt_size, false);
       Self::add_digest_to_object(object, hash)?;
-      Ok(disclosure)
+      Ok(())
     } else if let Some(array) = value.as_array_mut() {
-      let (disclosure, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
+      let (_, hash) = Self::random_digest(&self.hasher, self.salt_size, true);
       let tripledot = json!({ARRAY_DIGEST_KEY: hash});
       array.push(tripledot);
-      Ok(disclosure)
+      Ok(())
     } else {
       Err(Error::InvalidPath(format!(
         "{:?} is neither an object nor an array",
@@ -270,7 +249,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     };
     let decoy_value = Self::gen_rand(decoy_value_length);
     let disclosure = Disclosure::new(salt, decoy_claim_name, Value::String(decoy_value));
-    let hash = hasher.encoded_digest(disclosure.as_str());
+    let hash = hasher.encoded_digest(&disclosure.to_string());
     (disclosure, hash)
   }
 
@@ -283,29 +262,14 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   /// Returns a reference to the internal object.
-  pub fn object(&self) -> Result<&Map<String, Value>> {
+  pub fn object(&self) -> &Map<String, Value> {
     // Safety: encoder can be constructed from objects only.
-    self.object.as_object().ok_or(Error::DataTypeMismatch(
-      "encoder initialized with invalid JSON object".to_string(),
-    ))
+    self.object.as_object().unwrap()
   }
 
   /// Returns the used salt length.
   pub fn salt_size(&self) -> usize {
     self.salt_size
-  }
-
-  /// Sets size of random data used to generate the salts for disclosures in bytes.
-  ///
-  /// ## Warning
-  /// Salt size must be >= 16.
-  pub fn set_salt_size(&mut self, salt_size: usize) -> Result<()> {
-    if salt_size < 16 {
-      Err(Error::InvalidSaltSize)
-    } else {
-      self.salt_size = salt_size;
-      Ok(())
-    }
   }
 }
 
@@ -337,11 +301,11 @@ mod test {
   #[test]
   fn simple() {
     let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
-    encoder.conceal("/claim1/abc", None).unwrap();
-    encoder.conceal("/id", None).unwrap();
+    encoder.conceal("/claim1/abc").unwrap();
+    encoder.conceal("/id").unwrap();
     encoder.add_decoys("", 10).unwrap();
     encoder.add_decoys("/claim2", 10).unwrap();
-    assert!(encoder.object().unwrap().get("id").is_none());
+    assert!(encoder.object().get("id").is_none());
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
     assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
   }
@@ -349,9 +313,9 @@ mod test {
   #[test]
   fn errors() {
     let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
-    encoder.conceal("/claim1/abc", None).unwrap();
+    encoder.conceal("/claim1/abc").unwrap();
     assert!(matches!(
-      encoder.conceal("claim2/2", None).unwrap_err(),
+      encoder.conceal("claim2/2").unwrap_err(),
       Error::InvalidPath(_)
     ));
   }
@@ -360,11 +324,11 @@ mod test {
   fn test_wrong_path() {
     let mut encoder = SdObjectEncoder::try_from(object()).unwrap();
     assert!(matches!(
-      encoder.conceal("/claim12", None).unwrap_err(),
+      encoder.conceal("/claim12").unwrap_err(),
       Error::InvalidPath(_)
     ));
     assert!(matches!(
-      encoder.conceal("/claim12/0", None).unwrap_err(),
+      encoder.conceal("/claim12/0").unwrap_err(),
       Error::InvalidPath(_)
     ));
   }
@@ -376,7 +340,7 @@ mod test {
       claim2: vec!["arr-value1".to_string(), "arr-vlaue2".to_string()],
     };
     let mut encoder = SdObjectEncoder::try_from_serializable(test_value).unwrap();
-    encoder.conceal("/id", None).unwrap();
+    encoder.conceal("/id").unwrap();
     encoder.add_decoys("", 10).unwrap();
     encoder.add_decoys("/claim2", 10).unwrap();
     assert!(encoder.object.get("id").is_none());

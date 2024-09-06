@@ -39,4 +39,7 @@ pub enum Error {
 
   #[error("the validation ended with {0} unused disclosure(s)")]
   UnusedDisclosures(usize),
+
+  #[error("JWS creation failure: {0}")]
+  JwsSignerFailure(String),
 }
