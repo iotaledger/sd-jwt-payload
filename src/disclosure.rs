@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
+use serde_json::json;
 use serde_json::Value;
 use std::fmt::Display;
 
@@ -17,17 +18,35 @@ pub struct Disclosure {
   pub claim_name: Option<String>,
   /// The claim Value which can be of any type.
   pub claim_value: Value,
+  /// Base64Url-encoded disclosure.
+  unparsed: String,
+}
+
+impl AsRef<str> for Disclosure {
+  fn as_ref(&self) -> &str {
+    &self.unparsed
+  }
 }
 
 impl Disclosure {
   /// Creates a new instance of [`Disclosure`].
   ///
   /// Use `.to_string()` to get the actual disclosure.
-  pub fn new(salt: String, claim_name: Option<String>, claim_value: Value) -> Self {
+  pub(crate) fn new(salt: String, claim_name: Option<String>, claim_value: Value) -> Self {
+    let string_encoded = {
+      let json_input = if let Some(name) = claim_name.as_deref() {
+        json!([salt, name, claim_value])
+      } else {
+        json!([salt, claim_value])
+      };
+
+      multibase::Base::Base64Url.encode(json_input.to_string())
+    };
     Self {
       salt,
       claim_name,
       claim_value,
+      unparsed: string_encoded,
     }
   }
 
@@ -38,7 +57,7 @@ impl Disclosure {
   /// Returns an [`Error::InvalidDisclosure`] if input is not a valid disclosure.
   pub fn parse(disclosure: &str) -> Result<Self, Error> {
     let decoded: Vec<Value> = multibase::Base::Base64Url
-      .decode(&disclosure)
+      .decode(disclosure)
       .map_err(|_e| {
         Error::InvalidDisclosure(format!(
           "Base64 decoding of the disclosure was not possible {}",
@@ -69,6 +88,7 @@ impl Disclosure {
           .get(1)
           .ok_or(Error::InvalidDisclosure("invalid claim name".to_string()))?
           .clone(),
+        unparsed: disclosure.to_string(),
       })
     } else if decoded.len() == 3 {
       Ok(Self {
@@ -94,6 +114,7 @@ impl Disclosure {
           .get(2)
           .ok_or(Error::InvalidDisclosure("invalid claim name".to_string()))?
           .clone(),
+        unparsed: disclosure.to_string(),
       })
     } else {
       Err(Error::InvalidDisclosure(format!(
@@ -102,18 +123,15 @@ impl Disclosure {
       )))
     }
   }
+
+  pub fn as_str(&self) -> &str {
+    self.as_ref()
+  }
 }
 
 impl Display for Disclosure {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let input = if let Some(name) = self.claim_name.as_deref() {
-      format!("[\"{}\", \"{}\", {}]", self.salt, &name, self.claim_value.to_string())
-    } else {
-      format!("[\"{}\", {}]", self.salt, self.claim_value.to_string())
-    };
-
-    let encoded = multibase::Base::Base64Url.encode(input);
-    f.write_str(&encoded)
+    write!(f, "{}", self.unparsed)
   }
 }
 
@@ -131,8 +149,7 @@ mod test {
       "2012-04-23T18:25Z".to_owned().into(),
     );
 
-    let parsed =
-      Disclosure::parse("WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgInRpbWUiLCAiMjAxMi0wNC0yM1QxODoyNVoiXQ");
+    let parsed = Disclosure::parse("WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgInRpbWUiLCAiMjAxMi0wNC0yM1QxODoyNVoiXQ");
     assert_eq!(parsed.unwrap(), disclosure);
   }
 

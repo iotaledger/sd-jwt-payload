@@ -11,7 +11,9 @@ use josekit::jwt::JwtPayload;
 use josekit::jwt::{self};
 use sd_jwt_payload::JsonObject;
 use sd_jwt_payload::JwsSigner;
+use sd_jwt_payload::SdJwt;
 use sd_jwt_payload::SdJwtBuilder;
+use sd_jwt_payload::Sha256Hasher;
 use serde_json::json;
 
 struct HmacSignerAdapter(HmacJwsSigner);
@@ -59,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   let key = b"0123456789ABCDEF0123456789ABCDEF";
   let signer = HmacSignerAdapter(HS256.signer_from_bytes(key)?);
-  let mut sd_jwt = SdJwtBuilder::new(object)?
+  let sd_jwt = SdJwtBuilder::new(object)?
     .make_concealable("/email")?
     .make_concealable("/phone_number")?
     .make_concealable("/address/street_address")?
@@ -71,22 +73,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .finish(&signer, "HS256")
     .await?;
 
-  println!("encoded object: {}", serde_json::to_string_pretty(sd_jwt.claims())?);
+  println!("raw object: {}", serde_json::to_string_pretty(sd_jwt.claims())?);
 
-  // Issuer sends the SD-JWT with all its disclosures to its holder
-  // The holder decodes the token in order to see all of its properties.
+  // Issuer sends the SD-JWT with all its disclosures to its holder.
+  let received_sd_jwt = sd_jwt.presentation();
+  let mut sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
-  let decoded = sd_jwt.decode()?;
-  println!("decoded object: {}", serde_json::to_string_pretty(&decoded)?);
+  // The holder can withhold from a verifier any concealable claim by calling `conceal`.
+  let hasher = Sha256Hasher::new();
+  sd_jwt.conceal("/email", &hasher)?;
+  sd_jwt.conceal("/nationalities/0", &hasher)?;
 
-  // The holder can withhold from a verifier any conceilable claim by calling `conceal`.
-  sd_jwt.conceal("/email")?;
-  sd_jwt.conceal("/phone_number")?;
-  let concealed_token = sd_jwt.decode()?;
+  // The holder send its token to a verifier.
+  let received_sd_jwt = sd_jwt.presentation();
+  let sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
   println!(
-    "presented object with concealed data:\n{}",
-    serde_json::to_string_pretty(&concealed_token)?
+    "object to verify: {}",
+    serde_json::to_string_pretty(&sd_jwt.into_disclosed_object(&hasher)?)?
   );
 
   Ok(())

@@ -13,7 +13,6 @@ use crate::SdObjectEncoder;
 use crate::Sha256Hasher;
 use crate::DEFAULT_SALT_SIZE;
 use crate::HEADER_TYP;
-use multibase::encode;
 use multibase::Base;
 
 /// Builder structure to create an issuable SD-JWT.
@@ -92,7 +91,6 @@ impl<H: Hasher> SdJwtBuilder<H> {
     } = self;
     encoder.add_sd_alg_property();
     let mut object = encoder.object;
-    let hasher = &encoder.hasher;
     // Add key binding requirement as `cnf`.
     if let Some(key_bind) = key_bind {
       let key_bind = serde_json::to_value(key_bind).map_err(|e| Error::DeserializationError(e.to_string()))?;
@@ -110,7 +108,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
         .sign(&header, object.as_object().unwrap())
         .await
         .map_err(|e| Error::JwsSignerFailure(e.to_string()))?;
-      encode(Base::Base64Url, raw_signature)
+      Base::Base64Url.encode(raw_signature)
     };
 
     let claims = serde_json::from_value::<SdJwtClaims>(object)
@@ -120,10 +118,6 @@ impl<H: Hasher> SdJwtBuilder<H> {
       claims,
       signature,
     };
-    let disclosures = disclosures
-      .into_iter()
-      .map(|disclosure| (hasher.encoded_digest(&disclosure.to_string()), disclosure))
-      .collect();
 
     Ok(SdJwt::new(jwt, disclosures, None))
   }

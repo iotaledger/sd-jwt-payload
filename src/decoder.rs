@@ -3,6 +3,7 @@
 
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
+use crate::SD_ALG;
 
 use super::Disclosure;
 use crate::Error;
@@ -26,13 +27,16 @@ impl SdObjectDecoder {
     let mut processed_digests: Vec<String> = vec![];
 
     // Decode the object recursively.
-    let decoded = self.decode_object(object, disclosures, &mut processed_digests)?;
+    let mut decoded = self.decode_object(object, disclosures, &mut processed_digests)?;
 
     if processed_digests.len() != disclosures.len() {
       return Err(crate::Error::UnusedDisclosures(
         disclosures.len().saturating_sub(processed_digests.len()),
       ));
     }
+
+    // Remove `_sd_alg` in case it exists.
+    decoded.remove(SD_ALG);
 
     Ok(decoded)
   }
@@ -84,7 +88,7 @@ impl SdObjectDecoder {
               output.insert(claim_name, recursively_decoded);
             }
           }
-          if output.get(DIGESTS_KEY).unwrap().as_array().unwrap().is_empty() {
+          if output.get(DIGESTS_KEY).unwrap().is_array() {
             output.remove(DIGESTS_KEY);
           }
         }
@@ -194,7 +198,9 @@ mod test {
     let mut disclosure_map = HashMap::new();
     disclosure_map.insert(dis.to_string(), dis);
     let decoder = SdObjectDecoder;
-    let decoded = decoder.decode(encoder.object(), &disclosure_map).unwrap_err();
+    let decoded = decoder
+      .decode(encoder.object.as_object().unwrap(), &disclosure_map)
+      .unwrap_err();
     assert!(matches!(decoded, Error::ClaimCollisionError(_)));
   }
 
@@ -208,9 +214,11 @@ mod test {
     });
     let mut encoder = SdObjectEncoder::try_from(object).unwrap();
     encoder.add_sd_alg_property();
-    assert_eq!(encoder.object().get("_sd_alg").unwrap(), "sha-256");
+    assert_eq!(encoder.object.get("_sd_alg").unwrap(), "sha-256");
     let decoder = SdObjectDecoder;
-    let decoded = decoder.decode(encoder.object(), &HashMap::new()).unwrap();
+    let decoded = decoder
+      .decode(encoder.object.as_object().unwrap(), &HashMap::new())
+      .unwrap();
     assert!(decoded.get("_sd_alg").is_none());
   }
 }

@@ -9,7 +9,6 @@ use crate::Error;
 use crate::Result;
 use json_pointer::JsonPointer;
 use rand::Rng;
-use serde::Serialize;
 use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
@@ -31,29 +30,6 @@ pub struct SdObjectEncoder<H> {
   pub(crate) salt_size: usize,
   /// The hash function used to create digests.
   pub(crate) hasher: H,
-}
-
-#[cfg(feature = "sha")]
-impl SdObjectEncoder<Sha256Hasher> {
-  /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function.
-  ///
-  /// ## Error
-  /// Returns [`Error::DataTypeMismatch`] if `object` is not a valid JSON object.
-  pub fn new(object: Value) -> Result<Self> {
-    Self::try_from(object)
-  }
-
-  /// Creates a new [`SdObjectEncoder`] with `sha-256` hash function from a serializable object.
-  ///
-  /// ## Error
-  /// Returns [`Error::DeserializationError`] if `object` can not be serialized into a valid JSON object.
-  pub fn try_from_serializable<T>(object: T) -> Result<Self>
-  where
-    T: Serialize,
-  {
-    let object = serde_json::to_value(&object).map_err(|e| Error::DeserializationError(e.to_string()))?;
-    SdObjectEncoder::try_from(object)
-  }
 }
 
 #[cfg(feature = "sha")]
@@ -177,12 +153,6 @@ impl<H: Hasher> SdObjectEncoder<H> {
       .insert(SD_ALG.to_string(), Value::String(self.hasher.alg_name().to_string()));
   }
 
-  /// Returns the modified object as a string.
-  pub fn try_to_string(&self) -> Result<String> {
-    serde_json::to_string(&self.object)
-      .map_err(|_e| Error::Unspecified("error while serializing internal object".to_string()))
-  }
-
   /// Adds a decoy digest to the specified path.
   ///
   /// `path` indicates the pointer to the value that will be concealed using the syntax of
@@ -260,17 +230,6 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
     multibase::Base::Base64Url.encode(bytes)
   }
-
-  /// Returns a reference to the internal object.
-  pub fn object(&self) -> &Map<String, Value> {
-    // Safety: encoder can be constructed from objects only.
-    self.object.as_object().unwrap()
-  }
-
-  /// Returns the used salt length.
-  pub fn salt_size(&self) -> usize {
-    self.salt_size
-  }
 }
 
 #[cfg(test)]
@@ -278,15 +237,8 @@ mod test {
 
   use super::SdObjectEncoder;
   use crate::Error;
-  use serde::Serialize;
   use serde_json::json;
   use serde_json::Value;
-
-  #[derive(Serialize)]
-  struct TestStruct {
-    id: String,
-    claim2: Vec<String>,
-  }
 
   fn object() -> Value {
     json!({
@@ -305,7 +257,7 @@ mod test {
     encoder.conceal("/id").unwrap();
     encoder.add_decoys("", 10).unwrap();
     encoder.add_decoys("/claim2", 10).unwrap();
-    assert!(encoder.object().get("id").is_none());
+    assert!(encoder.object.get("id").is_none());
     assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
     assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
   }
@@ -331,20 +283,5 @@ mod test {
       encoder.conceal("/claim12/0").unwrap_err(),
       Error::InvalidPath(_)
     ));
-  }
-
-  #[test]
-  fn test_from_serializable() {
-    let test_value = TestStruct {
-      id: "did:value".to_string(),
-      claim2: vec!["arr-value1".to_string(), "arr-vlaue2".to_string()],
-    };
-    let mut encoder = SdObjectEncoder::try_from_serializable(test_value).unwrap();
-    encoder.conceal("/id").unwrap();
-    encoder.add_decoys("", 10).unwrap();
-    encoder.add_decoys("/claim2", 10).unwrap();
-    assert!(encoder.object.get("id").is_none());
-    assert_eq!(encoder.object.get("_sd").unwrap().as_array().unwrap().len(), 11);
-    assert_eq!(encoder.object.get("claim2").unwrap().as_array().unwrap().len(), 12);
   }
 }

@@ -6,6 +6,7 @@ use crypto::hashes::sha::SHA256;
 
 #[cfg(feature = "sha")]
 use crypto::hashes::sha::SHA256_LEN;
+use multibase::Base;
 
 pub const SHA_ALG_NAME: &str = "sha-256";
 
@@ -31,7 +32,7 @@ pub trait Hasher: Sync + Send {
   /// Returns the base64url-encoded digest of a `disclosure`.
   fn encoded_digest(&self, disclosure: &str) -> String {
     let hash = self.digest(disclosure.as_bytes());
-    multibase::Base::Base64Url.encode(hash)
+    Base::Base64Url.encode(hash)
   }
 }
 

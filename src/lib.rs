@@ -7,15 +7,15 @@ mod disclosure;
 mod encoder;
 mod error;
 mod hasher;
+mod jwt;
 mod key_binding_jwt_claims;
 mod sd_jwt;
-mod jwt;
 mod signer;
 
 pub use builder::*;
-pub use decoder::*;
+pub(crate) use decoder::*;
 pub use disclosure::*;
-pub use encoder::*;
+pub(crate) use encoder::*;
 pub use error::*;
 pub use hasher::*;
 pub use key_binding_jwt_claims::*;

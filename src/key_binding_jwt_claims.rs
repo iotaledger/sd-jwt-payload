@@ -8,7 +8,6 @@ use crate::JsonObject;
 use crate::JwsSigner;
 use crate::SdJwt;
 use crate::SHA_ALG_NAME;
-use multibase::encode;
 use multibase::Base;
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,7 +16,7 @@ use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
 
-pub const KB_JWT_HEADER_TYP: &'static str = "kb+jwt";
+pub const KB_JWT_HEADER_TYP: &str = "kb+jwt";
 
 /// Representation of a [KB-JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-12.html#name-key-binding-jwt).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,7 +124,7 @@ impl KeyBindingJwtBuilder {
       .sign(&header, &claims)
       .await
       .map_err(|e| Error::JwsSignerFailure(e.to_string()))
-      .map(|raw_sig| encode(Base::Base64Url, raw_sig))?;
+      .map(|raw_sig| Base::Base64Url.encode(raw_sig))?;
 
     Ok(KeyBindingJwt(Jwt {
       header,
