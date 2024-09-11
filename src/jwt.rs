@@ -14,6 +14,7 @@ pub struct Jwt<T> {
   pub header: JsonObject,
   pub claims: T,
   pub signature: String,
+  unparsed: String,
 }
 
 impl<T> Display for Jwt<T>
@@ -21,9 +22,7 @@ where
   T: Serialize,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let header = Base::Base64Url.encode(serde_json::to_vec(&self.header).unwrap());
-    let payload = Base::Base64Url.encode(serde_json::to_vec(&self.claims).unwrap());
-    write!(f, "{header}.{payload}.{}", &self.signature)
+    write!(f, "{}", &self.unparsed)
   }
 }
 
@@ -63,7 +62,23 @@ where
       header,
       claims,
       signature,
+      unparsed: s.to_string(),
     })
+  }
+}
+
+impl<T: Serialize> Jwt<T> {
+  pub fn new(header: JsonObject, payload: T, signature: String) -> Self {
+    let header_b64 = Base::Base64Url.encode(serde_json::to_vec(&header).unwrap());
+    let payload_b64 = Base::Base64Url.encode(serde_json::to_vec(&payload).unwrap());
+    let encoded = format!("{header_b64}.{payload_b64}.{signature}");
+
+    Self {
+      header,
+      claims: payload,
+      signature,
+      unparsed: encoded,
+    }
   }
 }
 

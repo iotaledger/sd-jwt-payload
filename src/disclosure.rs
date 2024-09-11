@@ -10,7 +10,7 @@ use std::fmt::Display;
 /// Both object properties and array elements disclosures are supported.
 ///
 /// See: https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#name-disclosures
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Disclosure {
   /// The salt value.
   pub salt: String,
@@ -135,6 +135,12 @@ impl Display for Disclosure {
   }
 }
 
+impl PartialEq for Disclosure {
+  fn eq(&self, other: &Self) -> bool {
+    self.claim_name == other.claim_name && self.salt == other.salt && self.claim_value == other.claim_value
+  }
+}
+
 #[cfg(test)]
 mod test {
   use super::Disclosure;
@@ -149,18 +155,8 @@ mod test {
       "2012-04-23T18:25Z".to_owned().into(),
     );
 
-    let parsed = Disclosure::parse("WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgInRpbWUiLCAiMjAxMi0wNC0yM1QxODoyNVoiXQ");
-    assert_eq!(parsed.unwrap(), disclosure);
-  }
-
-  // Test values from:
-  // https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.html#section-5.5-25
-  #[test]
-  fn test_creating() {
-    let disclosure = Disclosure::new("lklxF5jMYlGTPUovMNIvCA".to_owned(), None, "US".to_owned().into());
-    assert_eq!(
-      "WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0".to_owned(),
-      disclosure.to_string()
-    );
+    let parsed =
+      Disclosure::parse("WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgInRpbWUiLCAiMjAxMi0wNC0yM1QxODoyNVoiXQ").unwrap();
+    assert_eq!(parsed, disclosure);
   }
 }

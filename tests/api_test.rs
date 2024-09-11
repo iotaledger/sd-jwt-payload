@@ -71,13 +71,13 @@ fn simple_sd_jwt() {
 #[tokio::test]
 async fn concealing_parent_also_removes_all_sub_disclosures() -> anyhow::Result<()> {
   let hasher = Sha256Hasher::new();
-  let mut sd_jwt = make_sd_jwt(
+  let sd_jwt = make_sd_jwt(
     json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}),
     ["/parent/property1", "/parent/property2/0", "/parent"],
   )
   .await;
 
-  let removed_disclosures = sd_jwt.conceal("/parent", &hasher)?;
+  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish().1;
   assert_eq!(removed_disclosures.len(), 3);
 
   Ok(())
@@ -86,13 +86,16 @@ async fn concealing_parent_also_removes_all_sub_disclosures() -> anyhow::Result<
 #[tokio::test]
 async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> {
   let hasher = Sha256Hasher::new();
-  let mut sd_jwt = make_sd_jwt(
+  let sd_jwt = make_sd_jwt(
     json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}),
     ["/parent/property1", "/parent/property2/0", "/parent"],
   )
   .await;
 
-  sd_jwt.conceal("/parent/property2/0", &hasher)?;
+  sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/parent/property2/0")?
+    .finish();
 
   Ok(())
 }

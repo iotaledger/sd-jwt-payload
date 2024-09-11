@@ -186,12 +186,16 @@ eyJ0eXAiOiJTRC1KV1QiLCJhbGciOiJIUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9
 
 ### Handling
 
-Once an SD-JWT is obtained, any concealable property can be omitted from it by calling the `conceal` method:
+Once an SD-JWT is obtained, any concealable property can be omitted from it by creating a presentation and calling the
+`conceal` method:
 
 ```rust
   let mut sd_jwt = SdJwt::parse("...")?;
   let hasher = Sha256Hasher::new();
-  let disclosures: Vec<Disclosure> = sd_jwt.conceal("/address", &hasher)?;
+  let (presented_sd_jwt, removed_disclosures) = sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/address", &hasher)?
+    .finish();
 ```
 
 To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be used:
@@ -209,7 +213,9 @@ To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be us
     .finish(&sd_jwt, &hasher, "ES256", &signer)
     .await?;
   
-  sd_jwt.attach_key_binding_jwt(kb_jwt);
+  let (sd_jwt, _) = sd_jwt.into_presentation(&hasher)?
+    .attach_key_binding_jwt(kb_jwt)
+    .finish();
 ```
 
 ### Verifying

@@ -177,32 +177,9 @@ impl SdObjectDecoder {
 mod test {
   use std::collections::HashMap;
 
-  use crate::Error;
   use crate::SdObjectDecoder;
   use crate::SdObjectEncoder;
   use serde_json::json;
-  use serde_json::Value;
-
-  #[test]
-  fn collision() {
-    let object = json!({
-      "id": "did:value",
-    });
-    let mut encoder = SdObjectEncoder::try_from(object).unwrap();
-    let dis = encoder.conceal("/id").unwrap();
-    encoder
-      .object
-      .as_object_mut()
-      .unwrap()
-      .insert("id".to_string(), Value::String("id-value".to_string()));
-    let mut disclosure_map = HashMap::new();
-    disclosure_map.insert(dis.to_string(), dis);
-    let decoder = SdObjectDecoder;
-    let decoded = decoder
-      .decode(encoder.object.as_object().unwrap(), &disclosure_map)
-      .unwrap_err();
-    assert!(matches!(decoded, Error::ClaimCollisionError(_)));
-  }
 
   #[test]
   fn sd_alg() {

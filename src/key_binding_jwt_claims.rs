@@ -130,11 +130,7 @@ impl KeyBindingJwtBuilder {
       .map_err(|e| Error::JwsSignerFailure(e.to_string()))
       .map(|raw_sig| Base::Base64Url.encode(raw_sig))?;
 
-    Ok(KeyBindingJwt(Jwt {
-      header,
-      claims: parsed_claims,
-      signature,
-    }))
+    Ok(KeyBindingJwt(Jwt::new(header, parsed_claims, signature)))
   }
 }
 

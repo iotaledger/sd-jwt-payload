@@ -77,15 +77,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   // Issuer sends the SD-JWT with all its disclosures to its holder.
   let received_sd_jwt = sd_jwt.presentation();
-  let mut sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
+  let sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
   // The holder can withhold from a verifier any concealable claim by calling `conceal`.
   let hasher = Sha256Hasher::new();
-  sd_jwt.conceal("/email", &hasher)?;
-  sd_jwt.conceal("/nationalities/0", &hasher)?;
+  let (presented_sd_jwt, _removed_disclosures) = sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/email")?
+    .conceal("/nationalities/0")?
+    .finish();
 
   // The holder send its token to a verifier.
-  let received_sd_jwt = sd_jwt.presentation();
+  let received_sd_jwt = presented_sd_jwt.presentation();
   let sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
   println!(

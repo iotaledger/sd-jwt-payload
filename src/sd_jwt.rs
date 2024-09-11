@@ -89,81 +89,6 @@ impl SdJwt {
     self.key_binding_jwt.as_ref()
   }
 
-  /// Removes the disclosure for the property at `path`, conceiling it.
-  /// Might return `None` if the disclosure of the element at given `path` has already been removed.
-  pub fn conceal(&mut self, path: &str, hasher: &dyn Hasher) -> Result<Vec<Disclosure>> {
-    // Check `hasher` matches the hasher used for creating this sd-jwt.
-    let required_hasher = self.claims()._sd_alg.as_deref().unwrap_or(SHA_ALG_NAME);
-    let provided_hasher_alg = hasher.alg_name();
-    if required_hasher != provided_hasher_alg {
-      return Err(Error::MissingHasher(format!(
-        "the provided hasher uses algorithm \"{provided_hasher_alg}\", but algorithm \"{required_hasher}\" is required"
-      )));
-    }
-    // create the map <disclosure's digest> -> <disclosure>.
-    let mut disclosures = self
-      .disclosures
-      .drain(..)
-      .map(|disclosure| (hasher.encoded_digest(disclosure.as_str()), disclosure))
-      .collect();
-
-    let object = {
-      let sd = std::mem::take(&mut self.jwt.claims._sd)
-        .into_iter()
-        .map(Value::String)
-        .collect();
-      let mut object = Value::Object(std::mem::take(&mut self.jwt.claims.properties));
-      object
-        .as_object_mut()
-        .unwrap()
-        .insert(DIGESTS_KEY.to_string(), Value::Array(sd));
-
-      object
-    };
-    // always return `object` in its place before returning.
-    let result = (|| {
-      let path_segments = path.trim_start_matches('/').split('/').peekable();
-      let digests_to_remove = conceal(&object, path_segments, &disclosures)?
-        .into_iter()
-        // needed as some strings are borrowed for the lifetime of the borrow of `self.disclosures`.
-        .map(ToOwned::to_owned)
-        .collect_vec();
-
-      let removed_disclosures = digests_to_remove
-        .into_iter()
-        .flat_map(|digest| disclosures.remove(&digest))
-        .collect();
-      Ok(removed_disclosures)
-    })();
-
-    // Put everything back in its place.
-    self.disclosures = disclosures.into_values().collect();
-
-    let Value::Object(mut obj) = object else {
-      unreachable!();
-    };
-    let Value::Array(sd) = obj.remove(DIGESTS_KEY).unwrap() else {
-      unreachable!()
-    };
-    self.jwt.claims._sd = sd
-      .into_iter()
-      .map(|value| {
-        if let Value::String(s) = value {
-          s
-        } else {
-          unreachable!()
-        }
-      })
-      .collect();
-    self.jwt.claims.properties = obj;
-
-    result
-  }
-
-  pub fn attach_key_binding_jwt(&mut self, kb_jwt: KeyBindingJwt) {
-    self.key_binding_jwt = Some(kb_jwt);
-  }
-
   /// Serializes the components into the final SD-JWT.
   ///
   /// ## Error
@@ -213,6 +138,14 @@ impl SdJwt {
     })
   }
 
+  /// Prepares this [`SdJwt`] for a presentation, returning an [`SdJwtPresentationBuilder`].
+  /// ## Errors
+  /// - [`Error::MissingHasher`] is returned if the provided `hasher`'s algorithm doesn't match the algorithm specified
+  ///   by SD-JWT's `_sd_alg` claim. "sha-256" is used if the claim is missing.
+  pub fn into_presentation(self, hasher: &dyn Hasher) -> Result<SdJwtPresentationBuilder> {
+    SdJwtPresentationBuilder::new(self, hasher)
+  }
+
   /// Returns the JSON object obtained by replacing all disclosures into their
   /// corresponding JWT concealable claims.
   pub fn into_disclosed_object(self, hasher: &dyn Hasher) -> Result<JsonObject> {
@@ -239,6 +172,117 @@ impl FromStr for SdJwt {
   type Err = Error;
   fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
     Self::parse(s)
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct SdJwtPresentationBuilder {
+  sd_jwt: SdJwt,
+  disclosures: HashMap<String, Disclosure>,
+  removed_disclosures: Vec<Disclosure>,
+  object: Value,
+}
+
+impl Deref for SdJwtPresentationBuilder {
+  type Target = SdJwt;
+  fn deref(&self) -> &Self::Target {
+    &self.sd_jwt
+  }
+}
+
+impl SdJwtPresentationBuilder {
+  pub fn new(mut sd_jwt: SdJwt, hasher: &dyn Hasher) -> Result<Self> {
+    let required_hasher = sd_jwt.claims()._sd_alg.as_deref().unwrap_or(SHA_ALG_NAME);
+    if required_hasher != hasher.alg_name() {
+      return Err(Error::MissingHasher(format!(
+        "hasher \"{}\" was provided, but \"{required_hasher} is required\"",
+        hasher.alg_name()
+      )));
+    }
+    let disclosures = std::mem::take(&mut sd_jwt.disclosures)
+      .into_iter()
+      .map(|disclosure| (hasher.encoded_digest(disclosure.as_str()), disclosure))
+      .collect();
+    let object = {
+      let sd = std::mem::take(&mut sd_jwt.jwt.claims._sd)
+        .into_iter()
+        .map(Value::String)
+        .collect();
+      let mut object = Value::Object(std::mem::take(&mut sd_jwt.jwt.claims.properties));
+      object
+        .as_object_mut()
+        .unwrap()
+        .insert(DIGESTS_KEY.to_string(), Value::Array(sd));
+
+      object
+    };
+    Ok(Self {
+      sd_jwt,
+      disclosures,
+      removed_disclosures: vec![],
+      object,
+    })
+  }
+
+  /// Removes the disclosure for the property at `path`, conceiling it.
+  ///
+  /// ## Notes
+  /// - When concealing a claim more than one disclosure may be removed: the disclosure for the claim itself and the
+  ///   disclosures for any concealable sub-claim.
+  pub fn conceal(mut self, path: &str) -> Result<Self> {
+    let path_segments = path.trim_start_matches('/').split('/').peekable();
+    let digests_to_remove = conceal(&self.object, path_segments, &self.disclosures)?
+      .into_iter()
+      // needed, since some strings are borrowed for the lifetime of the borrow of `self.disclosures`.
+      .map(ToOwned::to_owned)
+      // needed, to drop borrow `self.disclosures`.
+      .collect_vec();
+
+    digests_to_remove
+      .into_iter()
+      .flat_map(|digest| self.disclosures.remove(&digest))
+      .for_each(|disclosure| self.removed_disclosures.push(disclosure));
+
+    Ok(self)
+  }
+
+  /// Adds a [`KeyBindingJwt`] to this [`SdJwt`]'s presentation.
+  pub fn attach_key_binding_jwt(mut self, kb_jwt: KeyBindingJwt) -> Self {
+    self.sd_jwt.key_binding_jwt = Some(kb_jwt);
+    self
+  }
+
+  /// Returns the resulting [`SdJwt`] together with all removed disclosures.
+  pub fn finish(self) -> (SdJwt, Vec<Disclosure>) {
+    // Put everything back in its place.
+    let SdJwtPresentationBuilder {
+      mut sd_jwt,
+      disclosures,
+      removed_disclosures,
+      object,
+      ..
+    } = self;
+    sd_jwt.disclosures = disclosures.into_values().collect_vec();
+
+    let Value::Object(mut obj) = object else {
+      unreachable!();
+    };
+    let Value::Array(sd) = obj.remove(DIGESTS_KEY).unwrap() else {
+      unreachable!()
+    };
+    sd_jwt.jwt.claims._sd = sd
+      .into_iter()
+      .map(|value| {
+        if let Value::String(s) = value {
+          s
+        } else {
+          unreachable!()
+        }
+      })
+      .collect();
+    sd_jwt.jwt.claims.properties = obj;
+
+    (sd_jwt, removed_disclosures)
   }
 }
 

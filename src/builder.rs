@@ -113,11 +113,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
 
     let claims = serde_json::from_value::<SdJwtClaims>(object)
       .map_err(|e| Error::DeserializationError(format!("invalid SD-JWT claims: {e}")))?;
-    let jwt = Jwt {
-      header,
-      claims,
-      signature,
-    };
+    let jwt = Jwt::new(header, claims, signature);
 
     Ok(SdJwt::new(jwt, disclosures, None))
   }

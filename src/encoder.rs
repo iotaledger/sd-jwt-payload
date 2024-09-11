@@ -122,7 +122,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
         );
 
         // Hash the disclosure.
-        let hash = self.hasher.encoded_digest(&disclosure.to_string());
+        let hash = self.hasher.encoded_digest(disclosure.as_str());
 
         // Add the hash to the "_sd" array if exists; otherwise, create the array and insert the hash.
         Self::add_digest_to_object(parent, hash)?;
@@ -131,7 +131,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
       Value::Array(_) => {
         let element = element_pointer.get_mut(&mut self.object).unwrap();
         let disclosure = Disclosure::new(salt, None, element.clone());
-        let hash = self.hasher.encoded_digest(&disclosure.to_string());
+        let hash = self.hasher.encoded_digest(disclosure.as_str());
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});
         *element = tripledot;
         Ok(disclosure)
@@ -219,7 +219,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
     };
     let decoy_value = Self::gen_rand(decoy_value_length);
     let disclosure = Disclosure::new(salt, decoy_claim_name, Value::String(decoy_value));
-    let hash = hasher.encoded_digest(&disclosure.to_string());
+    let hash = hasher.encoded_digest(disclosure.as_str());
     (disclosure, hash)
   }
 
