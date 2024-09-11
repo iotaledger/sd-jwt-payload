@@ -80,6 +80,10 @@ impl KeyBindingJwtBuilder {
     self.0.insert("nonce".to_string(), nonce.to_owned().into());
     self
   }
+  pub fn insert_property(mut self, name: &str, value: Value) -> Self {
+    self.0.insert(name.to_string(), value);
+    self
+  }
   pub async fn finish<S>(
     self,
     sd_jwt: &SdJwt,

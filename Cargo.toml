@@ -1,13 +1,13 @@
 [package]
 name = "sd-jwt-payload"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["IOTA Stiftung"]
 homepage = "https://www.iota.org"
 license = "Apache-2.0"
 repository = "https://github.com/iotaledger/sd-jwt-payload"
 readme = "./README.md"
-description = "Rust implementation of the Selective Disclosure for JWTs (SD-JWT)"
+description = "Rust implementation of Selective Disclosure JWTs (SD-JWT)"
 keywords = ["sd-jwt", "selective-disclosure", "disclosure"]
 
 [dependencies]
