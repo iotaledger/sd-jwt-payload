@@ -6,10 +6,10 @@ use serde_json::Value;
 
 pub type JsonObject = Map<String, Value>;
 
-/// JSON Web Signature Signer.
+/// JSON Web Signature (JWS) Signer.
 #[async_trait]
 pub trait JwsSigner {
   type Error: Error;
-  /// Creates a JWS.
+  /// Creates a JWS. The algorithm used for signed must be read from `header.alg` property.
   async fn sign(&self, header: &JsonObject, payload: &JsonObject) -> Result<Vec<u8>, Self::Error>;
 }

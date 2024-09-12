@@ -13,8 +13,7 @@ use crate::JsonObject;
 pub struct Jwt<T> {
   pub header: JsonObject,
   pub claims: T,
-  pub signature: String,
-  unparsed: String,
+  pub jws: String,
 }
 
 impl<T> Display for Jwt<T>
@@ -22,7 +21,7 @@ where
   T: Serialize,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", &self.unparsed)
+    write!(f, "{}", &self.jws)
   }
 }
 
@@ -47,10 +46,10 @@ where
         serde_json::from_slice::<T>(&json_bytes).map_err(|e| anyhow::anyhow!("invalid JWT claims: {e}"))
       })
       .map_err(|e| Error::DeserializationError(format!("invalid JWT: {e}")))?;
-    let signature = segments
+    let _signature = segments
       .next()
       .context("missing signature")
-      .map(String::from)
+      .and_then(|sig| Base::Base64Url.decode(sig).context("not base64url"))
       .map_err(|e| Error::DeserializationError(format!("invalid JWT: {e}")))?;
     if segments.next().is_some() {
       return Err(Error::DeserializationError(
@@ -61,24 +60,21 @@ where
     Ok(Self {
       header,
       claims,
-      signature,
-      unparsed: s.to_string(),
+      jws: s.to_string(),
     })
   }
 }
 
-impl<T: Serialize> Jwt<T> {
-  pub fn new(header: JsonObject, payload: T, signature: String) -> Self {
-    let header_b64 = Base::Base64Url.encode(serde_json::to_vec(&header).unwrap());
-    let payload_b64 = Base::Base64Url.encode(serde_json::to_vec(&payload).unwrap());
-    let encoded = format!("{header_b64}.{payload_b64}.{signature}");
-
-    Self {
-      header,
-      claims: payload,
-      signature,
-      unparsed: encoded,
-    }
+impl<T> Jwt<T> {
+  #[allow(dead_code)]
+  pub fn signature(&self) -> &str {
+    self
+      .jws
+      .split('.')
+      .rev()
+      .next()
+      // Safety: jws is a valid JWS.
+      .unwrap()
   }
 }
 

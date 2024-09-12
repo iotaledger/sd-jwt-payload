@@ -1,3 +1,5 @@
+use anyhow::Context as _;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::jwt::Jwt;
@@ -13,7 +15,6 @@ use crate::SdObjectEncoder;
 use crate::Sha256Hasher;
 use crate::DEFAULT_SALT_SIZE;
 use crate::HEADER_TYP;
-use multibase::Base;
 
 /// Builder structure to create an issuable SD-JWT.
 #[derive(Debug)]
@@ -29,19 +30,20 @@ impl SdJwtBuilder<Sha256Hasher> {
   ///
   /// ## Error
   /// Returns [`Error::DataTypeMismatch`] if `object` is not a valid JSON object.
-  pub fn new(object: Value) -> Result<Self> {
-    Self::new_with_hasher(Sha256Hasher::new(), object)
+  pub fn new<T: Serialize>(object: T) -> Result<Self> {
+    Self::new_with_hasher(object, Sha256Hasher::new())
   }
 }
 
 impl<H: Hasher> SdJwtBuilder<H> {
   /// Creates a new [`SdJwtBuilder`] with custom hash function to create digests.
-  pub fn new_with_hasher(hasher: H, object: Value) -> Result<Self> {
+  pub fn new_with_hasher<T: Serialize>(object: T, hasher: H) -> Result<Self> {
     Self::new_with_hasher_and_salt_size(object, hasher, DEFAULT_SALT_SIZE)
   }
 
   /// Creates a new [`SdJwtBuilder`] with custom hash function to create digests, and custom salt size.
-  pub fn new_with_hasher_and_salt_size(object: Value, hasher: H, salt_size: usize) -> Result<Self> {
+  pub fn new_with_hasher_and_salt_size<T: Serialize>(object: T, hasher: H, salt_size: usize) -> Result<Self> {
+    let object = serde_json::to_value(object).map_err(|e| Error::Unspecified(e.to_string()))?;
     let encoder = SdObjectEncoder::with_custom_hasher_and_salt_size(object, hasher, salt_size)?;
     Ok(Self {
       encoder,
@@ -50,11 +52,34 @@ impl<H: Hasher> SdJwtBuilder<H> {
     })
   }
 
-  /// Makes a property or value of the object concealable. See [`SdObjectEncoder::conceal`] for more details.
+  /// Substitutes a value with the digest of its disclosure.
   ///
   /// ## Notes
-  /// `path` indicates the pointer to the value that will be concealed using the syntax of
-  /// [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+  /// - `path` indicates the pointer to the value that will be concealed using the syntax of [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+  ///
+  ///
+  /// ## Example
+  ///  ```rust
+  ///  use sd_jwt_payload::SdJwtBuilder;
+  ///  use sd_jwt_payload::json;
+  ///
+  ///  let obj = json!({
+  ///   "id": "did:value",
+  ///   "claim1": {
+  ///      "abc": true
+  ///   },
+  ///   "claim2": ["val_1", "val_2"]
+  /// });
+  /// let builder = SdJwtBuilder::new(obj)
+  ///   .unwrap()
+  ///   .make_concealable("/id").unwrap() //conceals "id": "did:value"
+  ///   .make_concealable("/claim1/abc").unwrap() //"abc": true
+  ///   .make_concealable("/claim2/0").unwrap(); //conceals "val_1"
+  /// ```
+  /// 
+  /// ## Error
+  /// * [`Error::InvalidPath`] if pointer is invalid.
+  /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.
   pub fn make_concealable(mut self, path: &str) -> Result<Self> {
     let disclosure = self.encoder.conceal(path)?;
     self.disclosures.push(disclosure);
@@ -75,11 +100,15 @@ impl<H: Hasher> SdJwtBuilder<H> {
   }
 
   /// Require a proof of possession of a given key from the holder.
+  ///
+  /// This operation adds a JWT confirmation (`cnf`) claim as specified in
+  /// [RFC8300](https://www.rfc-editor.org/rfc/rfc7800.html#section-3).
   pub fn require_key_binding(mut self, key_bind: RequiredKeyBinding) -> Self {
     self.key_bind = Some(key_bind);
     self
   }
 
+  /// Creates an SD-JWT with the provided data.
   pub async fn finish<S>(self, signer: &S, alg: &str) -> Result<SdJwt>
   where
     S: JwsSigner,
@@ -103,17 +132,17 @@ impl<H: Hasher> SdJwtBuilder<H> {
     }) else {
       unreachable!();
     };
-    let signature = {
-      let raw_signature = signer
-        .sign(&header, object.as_object().unwrap())
-        .await
-        .map_err(|e| Error::JwsSignerFailure(e.to_string()))?;
-      Base::Base64Url.encode(raw_signature)
-    };
+
+    let jws = signer
+      .sign(&header, &object.as_object().unwrap())
+      .await
+      .map_err(|e| anyhow::anyhow!("jws failed: {e}"))
+      .and_then(|jws_bytes| String::from_utf8(jws_bytes).context("invalid JWS"))
+      .map_err(|e| Error::JwsSignerFailure(e.to_string()))?;
 
     let claims = serde_json::from_value::<SdJwtClaims>(object)
       .map_err(|e| Error::DeserializationError(format!("invalid SD-JWT claims: {e}")))?;
-    let jwt = Jwt::new(header, claims, signature);
+    let jwt = Jwt { header, claims, jws };
 
     Ok(SdJwt::new(jwt, disclosures, None))
   }

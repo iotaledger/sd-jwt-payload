@@ -16,6 +16,8 @@ use serde_json::Value;
 use sd_jwt_payload::SdJwt;
 use sd_jwt_payload::SdJwtBuilder;
 
+const HMAC_SECRET: &[u8; 32] = b"0123456789ABCDEF0123456789ABCDEF";
+
 struct HmacSignerAdapter(HmacJwsSigner);
 
 #[async_trait]
@@ -24,21 +26,13 @@ impl JwsSigner for HmacSignerAdapter {
   async fn sign(&self, header: &JsonObject, payload: &JsonObject) -> Result<Vec<u8>, Self::Error> {
     let header = JwsHeader::from_map(header.clone())?;
     let payload = JwtPayload::from_map(payload.clone())?;
-    let jwt = jwt::encode_with_signer(&payload, &header, &self.0)?;
-    let sig_bytes = jwt
-      .split('.')
-      .nth(2)
-      .map(|sig| multibase::Base::Base64Url.decode(sig))
-      .unwrap()
-      .unwrap();
 
-    Ok(sig_bytes)
+    jwt::encode_with_signer(&payload, &header, &self.0).map(String::into_bytes)
   }
 }
 
 async fn make_sd_jwt(object: Value, disclosable_values: impl IntoIterator<Item = &str>) -> SdJwt {
-  let key = b"0123456789ABCDEF0123456789ABCDEF";
-  let signer = HmacSignerAdapter(HS256.signer_from_bytes(key).unwrap());
+  let signer = HmacSignerAdapter(HS256.signer_from_bytes(HMAC_SECRET).unwrap());
   disclosable_values
     .into_iter()
     .fold(SdJwtBuilder::new(object).unwrap(), |builder, path| {
@@ -97,5 +91,15 @@ async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> 
     .conceal("/parent/property2/0")?
     .finish();
 
+  Ok(())
+}
+
+#[tokio::test]
+async fn sd_jwt_is_verifiable() -> anyhow::Result<()> {
+  let sd_jwt = make_sd_jwt(json!({"key": "value"}), []).await;
+  let jwt = sd_jwt.presentation().split_once('~').unwrap().0.to_string();
+  let verifier = HS256.verifier_from_bytes(HMAC_SECRET)?;
+
+  josekit::jwt::decode_with_verifier(&jwt, &verifier)?;
   Ok(())
 }

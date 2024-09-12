@@ -8,7 +8,7 @@ use crate::JsonObject;
 use crate::JwsSigner;
 use crate::SdJwt;
 use crate::SHA_ALG_NAME;
-use multibase::Base;
+use anyhow::Context as _;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -124,13 +124,18 @@ impl KeyBindingJwtBuilder {
     // Validate claims
     let parsed_claims = serde_json::from_value::<KeyBindingJwtClaims>(claims.clone().into())
       .map_err(|e| Error::DeserializationError(format!("invalid KB-JWT claims: {e}")))?;
-    let signature = signer
+    let jws = signer
       .sign(&header, &claims)
       .await
-      .map_err(|e| Error::JwsSignerFailure(e.to_string()))
-      .map(|raw_sig| Base::Base64Url.encode(raw_sig))?;
+      .map_err(|e| anyhow::anyhow!("{e}"))
+      .and_then(|jws_bytes| String::from_utf8(jws_bytes).context("invalid JWS"))
+      .map_err(|e| Error::JwsSignerFailure(e.to_string()))?;
 
-    Ok(KeyBindingJwt(Jwt::new(header, parsed_claims, signature)))
+    Ok(KeyBindingJwt(Jwt {
+      header,
+      claims: parsed_claims,
+      jws,
+    }))
   }
 }
 

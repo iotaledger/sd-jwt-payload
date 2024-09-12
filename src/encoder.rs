@@ -65,25 +65,6 @@ impl<H: Hasher> SdObjectEncoder<H> {
   /// `path` indicates the pointer to the value that will be concealed using the syntax of
   /// [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901).
   ///
-  ///
-  /// ## Example
-  ///  ```
-  ///  use sd_jwt_payload::SdObjectEncoder;
-  ///  use sd_jwt_payload::json;
-  ///
-  ///  let obj = json!({
-  ///   "id": "did:value",
-  ///   "claim1": {
-  ///      "abc": true
-  ///   },
-  ///   "claim2": ["val_1", "val_2"]
-  /// });
-  /// let mut encoder = SdObjectEncoder::try_from(obj).unwrap();
-  /// encoder.conceal("/id").unwrap(); //conceals "id": "did:value"
-  /// encoder.conceal("/claim1/abc").unwrap(); //"abc": true
-  /// encoder.conceal("/claim2/0").unwrap(); //conceals "val_1"
-  /// ```
-  /// 
   /// ## Error
   /// * [`Error::InvalidPath`] if pointer is invalid.
   /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.

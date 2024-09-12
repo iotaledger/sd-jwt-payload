@@ -24,15 +24,9 @@ impl JwsSigner for HmacSignerAdapter {
   async fn sign(&self, header: &JsonObject, payload: &JsonObject) -> Result<Vec<u8>, Self::Error> {
     let header = JwsHeader::from_map(header.clone())?;
     let payload = JwtPayload::from_map(payload.clone())?;
-    let jwt = jwt::encode_with_signer(&payload, &header, &self.0)?;
-    let sig_bytes = jwt
-      .split('.')
-      .nth(2)
-      .map(|sig| multibase::Base::Base64Url.decode(sig))
-      .unwrap()
-      .unwrap();
+    let jws = jwt::encode_with_signer(&payload, &header, &self.0)?;
 
-    Ok(sig_bytes)
+    Ok(jws.into_bytes())
   }
 }
 
