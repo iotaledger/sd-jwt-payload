@@ -71,8 +71,7 @@ impl<T> Jwt<T> {
     self
       .jws
       .split('.')
-      .rev()
-      .next()
+      .next_back()
       // Safety: jws is a valid JWS.
       .unwrap()
   }

@@ -134,7 +134,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
     };
 
     let jws = signer
-      .sign(&header, &object.as_object().unwrap())
+      .sign(&header, object.as_object().unwrap())
       .await
       .map_err(|e| anyhow::anyhow!("jws failed: {e}"))
       .and_then(|jws_bytes| String::from_utf8(jws_bytes).context("invalid JWS"))
