@@ -10,8 +10,8 @@ pub enum Error {
   #[error("invalid input: {0}")]
   InvalidDisclosure(String),
 
-  #[error("no hasher can be specified for the hashing algorithm {0}")]
-  MissingHasher(String),
+  #[error("invalid hasher: {0}")]
+  InvalidHasher(String),
 
   #[error("data type is not expected: {0}")]
   DataTypeMismatch(String),

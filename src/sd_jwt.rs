@@ -194,7 +194,7 @@ impl SdJwtPresentationBuilder {
   pub fn new(mut sd_jwt: SdJwt, hasher: &dyn Hasher) -> Result<Self> {
     let required_hasher = sd_jwt.claims()._sd_alg.as_deref().unwrap_or(SHA_ALG_NAME);
     if required_hasher != hasher.alg_name() {
-      return Err(Error::MissingHasher(format!(
+      return Err(Error::InvalidHasher(format!(
         "hasher \"{}\" was provided, but \"{required_hasher} is required\"",
         hasher.alg_name()
       )));

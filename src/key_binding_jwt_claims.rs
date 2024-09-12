@@ -106,7 +106,7 @@ impl KeyBindingJwtBuilder {
       ));
     }
     if sd_jwt.claims()._sd_alg.as_deref().unwrap_or(SHA_ALG_NAME) != hasher.alg_name() {
-      return Err(Error::MissingHasher(format!(
+      return Err(Error::InvalidHasher(format!(
         "invalid hashing algorithm \"{}\"",
         hasher.alg_name()
       )));

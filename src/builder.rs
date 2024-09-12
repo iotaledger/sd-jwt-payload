@@ -1,4 +1,5 @@
 use anyhow::Context as _;
+use itertools::Itertools;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -6,6 +7,7 @@ use crate::jwt::Jwt;
 use crate::Disclosure;
 use crate::Error;
 use crate::Hasher;
+use crate::JsonObject;
 use crate::JwsSigner;
 use crate::RequiredKeyBinding;
 use crate::Result;
@@ -20,6 +22,7 @@ use crate::HEADER_TYP;
 #[derive(Debug)]
 pub struct SdJwtBuilder<H> {
   encoder: SdObjectEncoder<H>,
+  header: JsonObject,
   disclosures: Vec<Disclosure>,
   key_bind: Option<RequiredKeyBinding>,
 }
@@ -49,6 +52,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
       encoder,
       disclosures: vec![],
       key_bind: None,
+      header: JsonObject::default(),
     })
   }
 
@@ -87,6 +91,16 @@ impl<H: Hasher> SdJwtBuilder<H> {
     Ok(self)
   }
 
+  /// Sets the JWT header.
+  /// ## Notes
+  /// - if [`SdJwtBuilder::header`] is not called, a default below header is used: ```json { "typ": "sd-jwt", "alg":
+  ///   "<algorithm used in SdJwtBulider::finish>" } ```
+  /// - `alg` is always replaced with the value passed to [`SdJwtBuilder::finish`].
+  pub fn header(mut self, header: JsonObject) -> Self {
+    self.header = header;
+    self
+  }
+
   /// Adds a decoy digest to the specified path.
   ///
   /// `path` indicates the pointer to the value that will be concealed using the syntax of
@@ -117,6 +131,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
       mut encoder,
       disclosures,
       key_bind,
+      mut header,
     } = self;
     encoder.add_sd_alg_property();
     let mut object = encoder.object;
@@ -126,12 +141,17 @@ impl<H: Hasher> SdJwtBuilder<H> {
       object.as_object_mut().unwrap().insert("cnf".to_string(), key_bind);
     }
 
-    let Value::Object(header) = serde_json::json!({
-      "typ": HEADER_TYP,
-      "alg": alg,
-    }) else {
-      unreachable!();
-    };
+    // Check mandatory header properties or insert them.
+    if let Some(Value::String(typ)) = header.get("typ") {
+      if !typ.split('+').contains(&HEADER_TYP) {
+        return Err(Error::DataTypeMismatch(
+          "invalid header: \"typ\" must contain type \"sd-jwt\"".to_string(),
+        ));
+      }
+    } else {
+      header.insert("typ".to_string(), Value::String(HEADER_TYP.to_string()));
+    }
+    header.insert("alg".to_string(), Value::String(alg.to_string()));
 
     let jws = signer
       .sign(&header, object.as_object().unwrap())
