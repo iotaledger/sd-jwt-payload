@@ -36,15 +36,11 @@ pub struct SdObjectEncoder<H> {
 impl TryFrom<Value> for SdObjectEncoder<Sha256Hasher> {
   type Error = crate::Error;
   fn try_from(value: Value) -> Result<Self> {
-    Self::with_custom_hasher(value, Sha256Hasher::new())
+    Self::with_custom_hasher_and_salt_size(value, Sha256Hasher::new(), DEFAULT_SALT_SIZE)
   }
 }
 
 impl<H: Hasher> SdObjectEncoder<H> {
-  /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests.
-  pub fn with_custom_hasher(object: Value, hasher: H) -> Result<Self> {
-    Self::with_custom_hasher_and_salt_size(object, hasher, DEFAULT_SALT_SIZE)
-  }
   /// Creates a new [`SdObjectEncoder`] with custom hash function to create digests, and custom salt size.
   pub fn with_custom_hasher_and_salt_size(object: Value, hasher: H, salt_size: usize) -> Result<Self> {
     if !object.is_object() {

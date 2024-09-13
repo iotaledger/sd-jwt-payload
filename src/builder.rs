@@ -1,3 +1,6 @@
+// Copyright 2020-2024 IOTA Stiftung
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::Context as _;
 use itertools::Itertools;
 use serde::Serialize;
@@ -14,6 +17,7 @@ use crate::Result;
 use crate::SdJwt;
 use crate::SdJwtClaims;
 use crate::SdObjectEncoder;
+#[cfg(feature = "sha")]
 use crate::Sha256Hasher;
 use crate::DEFAULT_SALT_SIZE;
 use crate::HEADER_TYP;
