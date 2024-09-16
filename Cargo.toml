@@ -32,8 +32,8 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 json-pointer = "0.3.4"
 serde_with = "3.6.1"
 josekit = "0.8.4"
-async-trait = "0.1.82"
-anyhow = "1.0.86"
+async-trait = "0.1.80"
+anyhow = "1"
 
 [dev-dependencies]
 tokio = { version = "1.38.1", features = ["macros", "rt-multi-thread"] }
