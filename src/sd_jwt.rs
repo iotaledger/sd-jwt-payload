@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Deref;
+use std::ops::DerefMut;
 use std::str::FromStr;
 
 use crate::jwt::Jwt;
@@ -40,6 +41,12 @@ impl Deref for SdJwtClaims {
   type Target = JsonObject;
   fn deref(&self) -> &Self::Target {
     &self.properties
+  }
+}
+
+impl DerefMut for SdJwtClaims {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.properties
   }
 }
 
