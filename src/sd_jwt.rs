@@ -25,7 +25,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct SdJwtClaims {
   #[serde(skip_serializing_if = "Vec::is_empty", default)]
   pub _sd: Vec<String>,
@@ -82,6 +82,14 @@ impl SdJwt {
 
   pub fn claims(&self) -> &SdJwtClaims {
     &self.jwt.claims
+  }
+
+  /// Returns a mutable reference to this SD-JWT's claims.
+  /// ## Warning
+  /// Modifying the claims might invalidate the signature.
+  /// Use this method carefully.
+  pub fn claims_mut(&mut self) -> &mut SdJwtClaims {
+    &mut self.jwt.claims
   }
 
   pub fn disclosures(&self) -> &[Disclosure] {
