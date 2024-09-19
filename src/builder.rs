@@ -171,3 +171,215 @@ impl<H: Hasher> SdJwtBuilder<H> {
     Ok(SdJwt::new(jwt, disclosures, None))
   }
 }
+
+#[cfg(test)]
+mod test {
+  use serde_json::json;
+
+  use super::*;
+
+  mod marking_properties_as_concealable {
+    use super::*;
+
+    mod that_exist {
+      use super::*;
+
+      mod on_top_level {
+        use super::*;
+
+        #[test]
+        fn can_be_done_for_object_values() {
+          let result = SdJwtBuilder::new(json!({ "address": {} }))
+            .unwrap()
+            .make_concealable("/address");
+
+          assert!(result.is_ok());
+        }
+
+        #[test]
+        fn can_be_done_for_array_elements() {
+          let result = SdJwtBuilder::new(json!({ "nationalities": ["US", "DE"] }))
+            .unwrap()
+            .make_concealable("/nationalities");
+
+          assert!(result.is_ok());
+        }
+      }
+
+      mod as_subproperties {
+        use super::*;
+
+        #[test]
+        fn can_be_done_for_object_values() {
+          let result = SdJwtBuilder::new(json!({ "address": { "country": "US" } }))
+            .unwrap()
+            .make_concealable("/address/country");
+
+          assert!(result.is_ok());
+        }
+
+        #[test]
+        fn can_be_done_for_array_elements() {
+          let result = SdJwtBuilder::new(json!({
+            "address": { "contact_person": [ "Jane Dow", "John Doe" ] }
+          }))
+          .unwrap()
+          .make_concealable("/address/contact_person/0");
+
+          assert!(result.is_ok());
+        }
+      }
+    }
+
+    mod that_do_not_exist {
+      use super::*;
+      mod on_top_level {
+        use super::*;
+
+        #[test]
+        fn returns_an_error_for_nonexistant_object_paths() {
+          let result = SdJwtBuilder::new(json!({})).unwrap().make_concealable("/email");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("email does not exist".to_string()),
+          );
+        }
+
+        #[test]
+        fn returns_an_error_for_nonexistant_array_paths() {
+          let result = SdJwtBuilder::new(json!({}))
+            .unwrap()
+            .make_concealable("/nationalities/0");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("nationalities/0 does not exist".to_string()),
+          );
+        }
+
+        #[test]
+        fn returns_an_error_for_nonexistant_array_entries() {
+          let result = SdJwtBuilder::new(json!({
+            "nationalities": ["US", "DE"]
+          }))
+          .unwrap()
+          .make_concealable("/nationalities/2");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("nationalities/2 does not exist".to_string()),
+          );
+        }
+      }
+
+      mod as_subproperties {
+        use super::*;
+
+        #[test]
+        fn returns_an_error_for_nonexistant_object_paths() {
+          let result = SdJwtBuilder::new(json!({
+            "address": {}
+          }))
+          .unwrap()
+          .make_concealable("/address/region");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("address/region does not exist".to_string()),
+          );
+        }
+
+        #[test]
+        fn returns_an_error_for_nonexistant_array_paths() {
+          let result = SdJwtBuilder::new(json!({
+            "address": {}
+          }))
+          .unwrap()
+          .make_concealable("/address/contact_person/2");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("address/contact_person/2 does not exist".to_string()),
+          );
+        }
+
+        #[test]
+        fn returns_an_error_for_nonexistant_array_entries() {
+          let result = SdJwtBuilder::new(json!({
+            "address": { "contact_person": [ "Jane Dow", "John Doe" ] }
+          }))
+          .unwrap()
+          .make_concealable("/address/contact_person/2");
+
+          assert_eq!(
+            result.unwrap_err(),
+            Error::InvalidPath("address/contact_person/2 does not exist".to_string()),
+          );
+        }
+      }
+    }
+  }
+
+  mod adding_decoys {
+    use super::*;
+
+    mod on_top_level {
+      use super::*;
+
+      #[test]
+      fn can_add_zero_object_value_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({})).unwrap().add_decoys("", 0);
+
+        assert!(result.is_ok());
+      }
+
+      #[test]
+      fn can_add_object_value_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({})).unwrap().add_decoys("", 2);
+
+        assert!(result.is_ok());
+      }
+    }
+
+    mod for_subproperties {
+      use super::*;
+
+      #[test]
+      fn can_add_zero_object_value_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({ "address": {} }))
+          .unwrap()
+          .add_decoys("/address", 0);
+
+        assert!(result.is_ok());
+      }
+
+      #[test]
+      fn can_add_object_value_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({ "address": {} }))
+          .unwrap()
+          .add_decoys("/address", 2);
+
+        assert!(result.is_ok());
+      }
+
+      #[test]
+      fn can_add_zero_array_element_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({ "nationalities": ["US", "DE"] }))
+          .unwrap()
+          .add_decoys("/nationalities", 0);
+
+        assert!(result.is_ok());
+      }
+
+      #[test]
+      fn can_add_array_element_decoys_for_a_path() {
+        let result = SdJwtBuilder::new(json!({ "nationalities": ["US", "DE"] }))
+          .unwrap()
+          .add_decoys("/nationalities", 2);
+
+        assert!(result.is_ok());
+      }
+    }
+  }
+}

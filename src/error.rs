@@ -4,7 +4,7 @@
 /// Alias for a `Result` with the error type [`Error`].
 pub type Result<T> = ::core::result::Result<T, Error>;
 
-#[derive(Debug, thiserror::Error, strum::IntoStaticStr)]
+#[derive(Debug, thiserror::Error, strum::IntoStaticStr, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
   #[error("invalid input: {0}")]
