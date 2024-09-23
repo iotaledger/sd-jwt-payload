@@ -85,7 +85,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
           .get_mut(&mut self.object)
           .map_err(|_| Error::InvalidPath(path.to_string()))?
           .as_object_mut()
-          .ok_or(Error::InvalidPath(path.to_string()))?;
+          .ok_or_else(|| Error::InvalidPath(path.to_string()))?;
 
         // Remove the value from the parent and create a disclosure for it.
         let disclosure = Disclosure::new(
@@ -93,7 +93,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
           Some(element_key.to_owned()),
           parent
             .remove(&element_key)
-            .ok_or(Error::InvalidPath(path.to_string()))?,
+            .ok_or_else(|| Error::InvalidPath(path.to_string()))?,
         );
 
         // Hash the disclosure.
