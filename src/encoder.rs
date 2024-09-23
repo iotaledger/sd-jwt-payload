@@ -70,24 +70,22 @@ impl<H: Hasher> SdObjectEncoder<H> {
 
     let element_pointer = path
       .parse::<JsonPointer<_, _>>()
-      .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
+      .map_err(|_| Error::InvalidPath(path.to_string()))?;
 
     let mut parent_pointer = element_pointer.clone();
-    let element_key = parent_pointer
-      .pop()
-      .ok_or(Error::InvalidPath("path does not contain any values".to_string()))?;
+    let element_key = parent_pointer.pop().ok_or(Error::InvalidPath(path.to_string()))?;
 
     let parent = parent_pointer
       .get(&self.object)
-      .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
+      .map_err(|_| Error::InvalidPath(path.to_string()))?;
 
     match parent {
       Value::Object(_) => {
         let parent = parent_pointer
           .get_mut(&mut self.object)
-          .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?
+          .map_err(|_| Error::InvalidPath(path.to_string()))?
           .as_object_mut()
-          .ok_or(Error::InvalidPath("path does not contain any values".to_string()))?;
+          .ok_or(Error::InvalidPath(path.to_string()))?;
 
         // Remove the value from the parent and create a disclosure for it.
         let disclosure = Disclosure::new(
@@ -95,7 +93,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
           Some(element_key.to_owned()),
           parent
             .remove(&element_key)
-            .ok_or(Error::InvalidPath(format!("{} does not exist", element_key)))?,
+            .ok_or(Error::InvalidPath(path.to_string()))?,
         );
 
         // Hash the disclosure.
@@ -106,7 +104,9 @@ impl<H: Hasher> SdObjectEncoder<H> {
         Ok(disclosure)
       }
       Value::Array(_) => {
-        let element = element_pointer.get_mut(&mut self.object).unwrap();
+        let element = element_pointer
+          .get_mut(&mut self.object)
+          .map_err(|_| Error::InvalidPath(path.to_string()))?;
         let disclosure = Disclosure::new(salt, None, element.clone());
         let hash = self.hasher.encoded_digest(disclosure.as_str());
         let tripledot = json!({ARRAY_DIGEST_KEY: hash});
@@ -144,13 +144,13 @@ impl<H: Hasher> SdObjectEncoder<H> {
   }
 
   fn add_decoy(&mut self, path: &str) -> Result<()> {
-    let mut element_pointer = path
+    let element_pointer = path
       .parse::<JsonPointer<_, _>>()
-      .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
+      .map_err(|_| Error::InvalidPath(path.to_string()))?;
 
     let value = element_pointer
       .get_mut(&mut self.object)
-      .map_err(|err| Error::InvalidPath(format!("{:?}", err)))?;
+      .map_err(|_| Error::InvalidPath(path.to_string()))?;
     if let Some(object) = value.as_object_mut() {
       let (_, hash) = Self::random_digest(&self.hasher, self.salt_size, false);
       Self::add_digest_to_object(object, hash)?;
@@ -161,10 +161,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
       array.push(tripledot);
       Ok(())
     } else {
-      Err(Error::InvalidPath(format!(
-        "{:?} is neither an object nor an array",
-        element_pointer.pop()
-      )))
+      Err(Error::InvalidPath(path.to_string()))
     }
   }
 

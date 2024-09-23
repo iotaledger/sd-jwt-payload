@@ -240,10 +240,7 @@ mod test {
         fn returns_an_error_for_nonexistant_object_paths() {
           let result = SdJwtBuilder::new(json!({})).unwrap().make_concealable("/email");
 
-          assert_eq!(
-            result.unwrap_err(),
-            Error::InvalidPath("email does not exist".to_string()),
-          );
+          assert_eq!(result.unwrap_err(), Error::InvalidPath("/email".to_string()),);
         }
 
         #[test]
@@ -252,10 +249,7 @@ mod test {
             .unwrap()
             .make_concealable("/nationalities/0");
 
-          assert_eq!(
-            result.unwrap_err(),
-            Error::InvalidPath("nationalities/0 does not exist".to_string()),
-          );
+          assert_eq!(result.unwrap_err(), Error::InvalidPath("/nationalities/0".to_string()),);
         }
 
         #[test]
@@ -266,10 +260,7 @@ mod test {
           .unwrap()
           .make_concealable("/nationalities/2");
 
-          assert_eq!(
-            result.unwrap_err(),
-            Error::InvalidPath("nationalities/2 does not exist".to_string()),
-          );
+          assert_eq!(result.unwrap_err(), Error::InvalidPath("/nationalities/2".to_string()),);
         }
       }
 
@@ -284,10 +275,7 @@ mod test {
           .unwrap()
           .make_concealable("/address/region");
 
-          assert_eq!(
-            result.unwrap_err(),
-            Error::InvalidPath("address/region does not exist".to_string()),
-          );
+          assert_eq!(result.unwrap_err(), Error::InvalidPath("/address/region".to_string()),);
         }
 
         #[test]
@@ -300,7 +288,7 @@ mod test {
 
           assert_eq!(
             result.unwrap_err(),
-            Error::InvalidPath("address/contact_person/2 does not exist".to_string()),
+            Error::InvalidPath("/address/contact_person/2".to_string()),
           );
         }
 
@@ -314,7 +302,7 @@ mod test {
 
           assert_eq!(
             result.unwrap_err(),
-            Error::InvalidPath("address/contact_person/2 does not exist".to_string()),
+            Error::InvalidPath("/address/contact_person/2".to_string()),
           );
         }
       }
