@@ -155,7 +155,7 @@ impl SdJwt {
 
   /// Prepares this [`SdJwt`] for a presentation, returning an [`SdJwtPresentationBuilder`].
   /// ## Errors
-  /// - [`Error::MissingHasher`] is returned if the provided `hasher`'s algorithm doesn't match the algorithm specified
+  /// - [`Error::InvalidHasher`] is returned if the provided `hasher`'s algorithm doesn't match the algorithm specified
   ///   by SD-JWT's `_sd_alg` claim. "sha-256" is used if the claim is missing.
   pub fn into_presentation(self, hasher: &dyn Hasher) -> Result<SdJwtPresentationBuilder> {
     SdJwtPresentationBuilder::new(self, hasher)
