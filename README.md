@@ -82,15 +82,23 @@ Any JSON object can be used to create an SD-JWT:
 
 ```rust
   let object = json!({
+    "sub": "user_42",
     "given_name": "John",
     "family_name": "Doe",
+    "email": "johndoe@example.com",
+    "phone_number": "+1-202-555-0101",
+    "phone_number_verified": true,
     "address": {
       "street_address": "123 Main St",
+      "locality": "Anytown",
       "region": "Anystate",
+      "country": "US"
     },
-    "phone": [
-      "+49 123456",
-      "+49 234567"
+    "birthdate": "1940-01-01",
+    "updated_at": 1570000000,
+    "nationalities": [
+      "US",
+      "DE"
     ]
   });
 ```
@@ -108,9 +116,11 @@ The builder can encode any of the object's values or array elements, using the `
 
 ```rust
   builder
+    .make_concealable("/email")?
+    .make_concealable("/phone_number")?
     .make_concealable("/address/street_address")?
     .make_concealable("/address")?
-    .make_concealable("/phone/0")?
+    .make_concealable("/nationalities/0")?
 ```
 
 *Note: the `make_concealable` method takes a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) to determine the element to conceal inside the JSON object.*
@@ -120,51 +130,47 @@ The builder also supports adding decoys. For instance, the amount of phone numbe
 
 ```rust
   builder
-    .add_decoys("/phone", 3)? // Adds 3 decoys to the array `phone`.
-    .add_decoys("", 6)? // Adds 6 decoys to the top level object.
+    .add_decoys("/nationalities", 1)? // Adds 1 decoys to the array `nationalities`.
+    .add_decoys("", 2)? // Adds 2 decoys to the top level object.
 ```
 
 Through the builder an issuer can require a specific key-binding that will be verified upon validation:
 
 ```rust
   builder
-    .require_key_binding(RequiredKeyBinding::Kid("key-42".to_string()))
+    .require_key_binding(RequiredKeyBinding::Kid("key1".to_string()))
 ```
 
 Internally, builder's object now looks like:
 
 ```json
 {
+  "_sd": [
+    "5P7JOl7w5kWrMDQ71U4ts1CHaPPNTKDqOt9OaOdGMOg",
+    "73rQnMSG1np-GjzaM-yHfcZAIqmeaIK9Dn9N0atxHms",
+    "s0UiQ41MTAPnjfKk4HEYet0ksuMo0VTArCwG5ALiC84",
+    "v-xRCoLxbDcL5NZGX9uRFI0hgH9gx3uX1Y1EMcWeC5k",
+    "z7SAFTHCOGF8vXbHyIPXH6TQvo750AdGXhvqgMTA8Mw"
+  ],
+  "_sd_alg": "sha-256",
   "cnf": {
-    "kid": "key-42"
+    "kid": "key1"
   },
+  "sub": "user_42",
   "given_name": "John",
   "family_name": "Doe",
-  "phone": [
+  "nationalities": [
     {
-      "...": "eZVn0KkQm_T8x-x57VxYt-_MmNG91Sh34E-bZEnNfWY"
+      "...": "xYpMTpfay0Rb77IWvbJU1C4JT3kvJUftZHxZuwfiS1M"
     },
-    "+49 234567",
+    "DE",
     {
-      "...": "KAiJIx0tktQRXBxZSBVVld9298bZIp2WkpkDYDa3CWQ"
-    },
-    {
-      "...": "CBKARPh6sdTCJyliZ7pBOYzix7Z4Bb4yRh0EykHX2Uw"
-    },
-    {
-      "...": "oi1KgsYXgqBFXUXvbVaHSGYYaWhkB5RL55T90Gl_5s0"
+      "...": "GqcdlPi6GUDcj9VVpm8kj29jfXCdyBx2GfWP34339hI"
     }
   ],
-  "_sd": [
-    "Jj5jBeGEawY6vRvmHDg55EjeAIP8FVhWEV2FczhUXrY",
-    "8eqphBPJyCBgUJhNWNP7ci-Y79N615wpZQrxi5D4ju8",
-    "_hOU5puJjNzSBhK0bwh3h8_b6H6nN7vd_7I0uTp80Mo",
-    "G_tH70MrfCkVM0HhsH9REObIt1Ei19477y6CEsS0Zlo",
-    "zP56MeH0ryjzqh9Kadrb5C9Z2BE2FWg8nb3g0rR3LSA",
-    "dgfVW11ip9OOyVi8M4h1RjXK8akw7ICeMQkjUwSI6iU",
-    "Bx33mOyTF5-w8gRS5yL4YQ4dig44V3lmHxk1WRss_7U"
-  ],
-  "_sd_alg": "sha-256"
+  "phone_number_verified": true,
+  "updated_at": 1570000000,
+  "birthdate": "1940-01-01"
 }
 ```
 
@@ -194,8 +200,9 @@ Once an SD-JWT is obtained, any concealable property can be omitted from it by c
   let hasher = Sha256Hasher::new();
   let (presented_sd_jwt, removed_disclosures) = sd_jwt
     .into_presentation(&hasher)?
-    .conceal("/address", &hasher)?
-    .finish();
+    .conceal("/email")?
+    .conceal("/nationalities/0")?
+    .finish()?;
 ```
 
 To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be used:
@@ -215,7 +222,7 @@ To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be us
   
   let (sd_jwt, _) = sd_jwt.into_presentation(&hasher)?
     .attach_key_binding_jwt(kb_jwt)
-    .finish();
+    .finish()?;
 ```
 
 ### Verifying
@@ -230,12 +237,25 @@ The SD-JWT can be turned into a JSON object of its disclosed values by calling t
 
 ```json
 {
+  "address": {
+    "country": "US",
+    "locality": "Anytown",
+    "region": "Anystate",
+    "street_address": "123 Main St"
+  },
+  "phone_number": "+1-202-555-0101",
+  "cnf": {
+    "kid": "key1"
+  },
+  "sub": "user_42",
   "given_name": "John",
   "family_name": "Doe",
-  "phone": [
-    "+49 123456",
-    "+49 234567"
-  ]
+  "nationalities": [
+    "DE"
+  ],
+  "phone_number_verified": true,
+  "updated_at": 1570000000,
+  "birthdate": "1940-01-01"
 }
 
 ```

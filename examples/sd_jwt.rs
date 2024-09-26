@@ -11,6 +11,7 @@ use josekit::jwt::JwtPayload;
 use josekit::jwt::{self};
 use sd_jwt_payload::JsonObject;
 use sd_jwt_payload::JwsSigner;
+use sd_jwt_payload::KeyBindingJwtBuilder;
 use sd_jwt_payload::SdJwt;
 use sd_jwt_payload::SdJwtBuilder;
 use sd_jwt_payload::Sha256Hasher;
@@ -73,12 +74,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let received_sd_jwt = sd_jwt.presentation();
   let sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
-  // The holder can withhold from a verifier any concealable claim by calling `conceal`.
   let hasher = Sha256Hasher::new();
+  let kb_jwt = KeyBindingJwtBuilder::new()
+    .aud("https://verifier.example.com")
+    .nonce("abcdefghi")
+    .iat(164389238943)
+    .finish(&sd_jwt, &hasher, "HS256", &signer)
+    .await?;
+
+  // The holder can withhold from a verifier any concealable claim by calling `conceal`.
   let (presented_sd_jwt, _removed_disclosures) = sd_jwt
     .into_presentation(&hasher)?
     .conceal("/email")?
     .conceal("/nationalities/0")?
+    .attach_key_binding_jwt(kb_jwt)
     .finish()?;
 
   // The holder send its token to a verifier.
