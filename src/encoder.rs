@@ -169,7 +169,14 @@ impl<H: Hasher> SdObjectEncoder<H> {
   fn add_digest_to_object(object: &mut Map<String, Value>, digest: String) -> Result<()> {
     if let Some(sd_value) = object.get_mut(DIGESTS_KEY) {
       if let Value::Array(value) = sd_value {
-        value.push(Value::String(digest))
+        // Insert the
+        let idx = value
+          .iter()
+          .enumerate()
+          .find(|(_, value)| value.as_str().is_some_and(|s| s > &digest))
+          .map(|(pos, _)| pos)
+          .unwrap_or(value.len());
+        value.insert(idx, Value::String(digest));
       } else {
         return Err(Error::DataTypeMismatch(
           "invalid object: existing `_sd` type is not an array".to_string(),
