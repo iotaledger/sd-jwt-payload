@@ -103,7 +103,7 @@ This creates a stateful builder with `Sha-256` hash function by default to creat
 
 *Note: `SdJwtBuilder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-The builder can encode any of the object's values or array elements, using the `make_concealable` method. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
+The builder can encode any of the object's values or array elements, using the `make_concealable` method. Suppose the value of `street_address` in 'address' should be selectively disclosed as well as the entire value of `address` and the first `phone` value.
 
 
 ```rust
