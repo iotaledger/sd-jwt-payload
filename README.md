@@ -120,7 +120,7 @@ The builder also supports adding decoys. For instance, the amount of phone numbe
 
 ```rust
   builder
-    .add_decoys("/phone", 3)? //Adds 3 decoys to the array `phone`.
+    .add_decoys("/phone", 3)? // Adds 3 decoys to the array `phone`.
     .add_decoys("", 6)? // Adds 6 decoys to the top level object.
 ```
 
