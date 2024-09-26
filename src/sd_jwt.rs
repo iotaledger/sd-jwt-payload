@@ -115,7 +115,11 @@ impl SdJwt {
       .as_ref()
       .map(ToString::to_string)
       .unwrap_or_default();
-    format!("{}~{}~{}", self.jwt, disclosures, key_bindings)
+    if disclosures.is_empty() {
+      format!("{}~{}", self.jwt, key_bindings)
+    } else {
+      format!("{}~{}~{}", self.jwt, disclosures, key_bindings)
+    }
   }
 
   /// Parses an SD-JWT into its components as [`SdJwt`].
@@ -128,13 +132,6 @@ impl SdJwt {
       ));
     }
 
-    let includes_key_binding = sd_jwt.chars().next_back().is_some_and(|char| char != '~');
-    if includes_key_binding && num_of_segments < 3 {
-      return Err(Error::DeserializationError(
-        "SD-JWT format is invalid, less than 3 segments with key binding jwt".to_string(),
-      ));
-    }
-
     let jwt = sd_segments.first().unwrap().parse()?;
 
     let disclosures = sd_segments[1..num_of_segments - 1]
@@ -142,8 +139,10 @@ impl SdJwt {
       .map(|s| Disclosure::parse(s))
       .try_collect()?;
 
-    let key_binding_jwt = includes_key_binding
-      .then(|| sd_segments[num_of_segments - 1].parse())
+    let key_binding_jwt = sd_segments
+      .last()
+      .filter(|segment| !segment.is_empty())
+      .map(|segment| segment.parse())
       .transpose()?;
 
     Ok(Self {

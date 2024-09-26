@@ -12,6 +12,7 @@ use anyhow::Context as _;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -72,12 +73,18 @@ impl KeyBindingJwtBuilder {
     self.0.insert("iat".to_string(), iat.into());
     self
   }
-  pub fn aud(mut self, aud: impl ToOwned<Owned = String>) -> Self {
-    self.0.insert("aud".to_string(), aud.to_owned().into());
+  pub fn aud<'a, S>(mut self, aud: S) -> Self
+  where
+    S: Into<Cow<'a, str>>,
+  {
+    self.0.insert("aud".to_string(), aud.into().into_owned().into());
     self
   }
-  pub fn nonce(mut self, nonce: impl ToOwned<Owned = String>) -> Self {
-    self.0.insert("nonce".to_string(), nonce.to_owned().into());
+  pub fn nonce<'a, S>(mut self, nonce: S) -> Self
+  where
+    S: Into<Cow<'a, str>>,
+  {
+    self.0.insert("nonce".to_string(), nonce.into().into_owned().into());
     self
   }
   pub fn insert_property(mut self, name: &str, value: Value) -> Self {

@@ -7,8 +7,10 @@ use josekit::jws::JwsHeader;
 use josekit::jws::HS256;
 use josekit::jwt;
 use josekit::jwt::JwtPayload;
+use sd_jwt_payload::Hasher;
 use sd_jwt_payload::JsonObject;
 use sd_jwt_payload::JwsSigner;
+use sd_jwt_payload::KeyBindingJwt;
 use sd_jwt_payload::Sha256Hasher;
 use serde_json::json;
 use serde_json::Value;
@@ -39,6 +41,17 @@ async fn make_sd_jwt(object: Value, disclosable_values: impl IntoIterator<Item =
       builder.make_concealable(path).unwrap()
     })
     .finish(&signer, "HS256")
+    .await
+    .unwrap()
+}
+
+async fn make_kb_jwt(sd_jwt: &SdJwt, hasher: &dyn Hasher) -> KeyBindingJwt {
+  let signer = HmacSignerAdapter(HS256.signer_from_bytes(HMAC_SECRET).unwrap());
+  KeyBindingJwt::builder()
+    .nonce("abcdefghi")
+    .aud("https://example.com")
+    .iat(1458304832)
+    .finish(sd_jwt, hasher, "HS256", &signer)
     .await
     .unwrap()
 }
@@ -101,5 +114,36 @@ async fn sd_jwt_is_verifiable() -> anyhow::Result<()> {
   let verifier = HS256.verifier_from_bytes(HMAC_SECRET)?;
 
   josekit::jwt::decode_with_verifier(&jwt, &verifier)?;
+  Ok(())
+}
+
+#[tokio::test]
+async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}), []).await;
+  // Try to serialize & deserialize `sd_jwt`.
+  let sd_jwt = {
+    let s = sd_jwt.to_string();
+    s.parse::<SdJwt>()?
+  };
+
+  assert!(sd_jwt.disclosures().is_empty());
+  assert!(sd_jwt.key_binding_jwt().is_none());
+
+  let with_kb = sd_jwt
+    .clone()
+    .into_presentation(&hasher)?
+    .attach_key_binding_jwt(make_kb_jwt(&sd_jwt, &hasher).await)
+    .finish()
+    .0;
+  // Try to serialize & deserialize `with_kb`.
+  let with_kb = {
+    let s = with_kb.to_string();
+    s.parse::<SdJwt>()?
+  };
+
+  assert!(with_kb.disclosures().is_empty());
+  assert!(with_kb.key_binding_jwt().is_some());
+
   Ok(())
 }
