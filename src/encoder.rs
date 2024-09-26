@@ -169,7 +169,7 @@ impl<H: Hasher> SdObjectEncoder<H> {
   fn add_digest_to_object(object: &mut Map<String, Value>, digest: String) -> Result<()> {
     if let Some(sd_value) = object.get_mut(DIGESTS_KEY) {
       if let Value::Array(value) = sd_value {
-        // Insert the
+        // Make sure the digests are sorted.
         let idx = value
           .iter()
           .enumerate()
