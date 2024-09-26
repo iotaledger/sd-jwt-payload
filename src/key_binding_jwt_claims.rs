@@ -60,35 +60,47 @@ impl KeyBindingJwt {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct KeyBindingJwtBuilder(JsonObject);
+pub struct KeyBindingJwtBuilder {
+  header: JsonObject,
+  payload: JsonObject,
+}
 
 impl KeyBindingJwtBuilder {
   pub fn new() -> Self {
     Self::default()
   }
   pub fn from_object(object: JsonObject) -> Self {
-    Self(object)
+    Self {
+      header: JsonObject::default(),
+      payload: object,
+    }
+  }
+  pub fn header(mut self, header: JsonObject) -> Self {
+    self.header = header;
+    self
   }
   pub fn iat(mut self, iat: i64) -> Self {
-    self.0.insert("iat".to_string(), iat.into());
+    self.payload.insert("iat".to_string(), iat.into());
     self
   }
   pub fn aud<'a, S>(mut self, aud: S) -> Self
   where
     S: Into<Cow<'a, str>>,
   {
-    self.0.insert("aud".to_string(), aud.into().into_owned().into());
+    self.payload.insert("aud".to_string(), aud.into().into_owned().into());
     self
   }
   pub fn nonce<'a, S>(mut self, nonce: S) -> Self
   where
     S: Into<Cow<'a, str>>,
   {
-    self.0.insert("nonce".to_string(), nonce.into().into_owned().into());
+    self
+      .payload
+      .insert("nonce".to_string(), nonce.into().into_owned().into());
     self
   }
   pub fn insert_property(mut self, name: &str, value: Value) -> Self {
-    self.0.insert(name.to_string(), value);
+    self.payload.insert(name.to_string(), value);
     self
   }
   pub async fn finish<S>(
@@ -101,7 +113,7 @@ impl KeyBindingJwtBuilder {
   where
     S: JwsSigner,
   {
-    let mut claims = self.0;
+    let mut claims = self.payload;
     if alg == "none" {
       return Err(Error::DataTypeMismatch(
         "A KeyBindingJwt cannot use algorithm \"none\"".to_string(),
@@ -121,12 +133,11 @@ impl KeyBindingJwtBuilder {
     let sd_hash = hasher.encoded_digest(&sd_jwt.to_string());
     claims.insert("sd_hash".to_string(), sd_hash.into());
 
-    let Value::Object(header) = serde_json::json!({
-      "alg": alg,
-      "typ": KB_JWT_HEADER_TYP,
-    }) else {
-      unreachable!();
-    };
+    let mut header = self.header;
+    header.insert("alg".to_string(), alg.to_owned().into());
+    header
+      .entry("typ")
+      .or_insert_with(|| KB_JWT_HEADER_TYP.to_owned().into());
 
     // Validate claims
     let parsed_claims = serde_json::from_value::<KeyBindingJwtClaims>(claims.clone().into())

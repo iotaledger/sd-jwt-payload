@@ -267,7 +267,13 @@ impl SdJwtPresentationBuilder {
   }
 
   /// Returns the resulting [`SdJwt`] together with all removed disclosures.
-  pub fn finish(self) -> (SdJwt, Vec<Disclosure>) {
+  /// ## Errors
+  /// - Fails with [`Error::MissingKeyBindingJwt`] if this [`SdJwt`] requires a key binding but none was provided.
+  pub fn finish(self) -> Result<(SdJwt, Vec<Disclosure>)> {
+    if self.sd_jwt.required_key_bind().is_some() && self.key_binding_jwt.is_none() {
+      return Err(Error::MissingKeyBindingJwt);
+    }
+
     // Put everything back in its place.
     let SdJwtPresentationBuilder {
       mut sd_jwt,
@@ -281,7 +287,7 @@ impl SdJwtPresentationBuilder {
     let Value::Object(mut obj) = object else {
       unreachable!();
     };
-    let Value::Array(sd) = obj.remove(DIGESTS_KEY).unwrap() else {
+    let Value::Array(sd) = obj.remove(DIGESTS_KEY).unwrap_or(Value::Array(vec![])) else {
       unreachable!()
     };
     sd_jwt.jwt.claims._sd = sd
@@ -296,7 +302,7 @@ impl SdJwtPresentationBuilder {
       .collect();
     sd_jwt.jwt.claims.properties = obj;
 
-    (sd_jwt, removed_disclosures)
+    Ok((sd_jwt, removed_disclosures))
   }
 }
 

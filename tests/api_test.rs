@@ -84,7 +84,7 @@ async fn concealing_parent_also_removes_all_sub_disclosures() -> anyhow::Result<
   )
   .await;
 
-  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish().1;
+  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish()?.1;
   assert_eq!(removed_disclosures.len(), 3);
 
   Ok(())
@@ -102,7 +102,7 @@ async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> 
   sd_jwt
     .into_presentation(&hasher)?
     .conceal("/parent/property2/0")?
-    .finish();
+    .finish()?;
 
   Ok(())
 }
@@ -134,7 +134,7 @@ async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
     .clone()
     .into_presentation(&hasher)?
     .attach_key_binding_jwt(make_kb_jwt(&sd_jwt, &hasher).await)
-    .finish()
+    .finish()?
     .0;
   // Try to serialize & deserialize `with_kb`.
   let with_kb = {

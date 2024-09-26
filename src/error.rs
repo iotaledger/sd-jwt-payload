@@ -42,4 +42,7 @@ pub enum Error {
 
   #[error("JWS creation failure: {0}")]
   JwsSignerFailure(String),
+
+  #[error("Missing required KB-JWT")]
+  MissingKeyBindingJwt,
 }

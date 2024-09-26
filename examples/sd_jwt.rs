@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .into_presentation(&hasher)?
     .conceal("/email")?
     .conceal("/nationalities/0")?
-    .finish();
+    .finish()?;
 
   // The holder send its token to a verifier.
   let received_sd_jwt = presented_sd_jwt.presentation();
