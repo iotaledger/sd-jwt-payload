@@ -108,9 +108,9 @@ impl<H: Hasher> SdJwtBuilder<H> {
   }
 
   /// Adds a new claim to the underlying object.
-  pub fn insert_claim<K, V>(mut self, key: K, value: V) -> Self
+  pub fn insert_claim<'a, K, V>(mut self, key: K, value: V) -> Self
   where
-    K: for<'a> Into<Cow<'a, str>>,
+    K: Into<Cow<'a, str>>,
     V: Serialize,
   {
     let key = key.into().into_owned();
