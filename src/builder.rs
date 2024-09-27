@@ -1,6 +1,8 @@
 // Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
+use std::borrow::Cow;
+
 use anyhow::Context as _;
 use itertools::Itertools;
 use serde::Serialize;
@@ -84,7 +86,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
   ///   .make_concealable("/claim1/abc").unwrap() //"abc": true
   ///   .make_concealable("/claim2/0").unwrap(); //conceals "val_1"
   /// ```
-  /// 
+  ///
   /// ## Error
   /// * [`Error::InvalidPath`] if pointer is invalid.
   /// * [`Error::DataTypeMismatch`] if existing SD format is invalid.
@@ -102,6 +104,19 @@ impl<H: Hasher> SdJwtBuilder<H> {
   /// - `alg` is always replaced with the value passed to [`SdJwtBuilder::finish`].
   pub fn header(mut self, header: JsonObject) -> Self {
     self.header = header;
+    self
+  }
+
+  /// Adds a new claim to the underlying object.
+  pub fn insert_claim<K, V>(mut self, key: K, value: V) -> Self
+  where
+    K: for<'a> Into<Cow<'a, str>>,
+    V: Serialize,
+  {
+    let key = key.into().into_owned();
+    let value = serde_json::to_value(value).unwrap();
+    self.encoder.object.as_object_mut().unwrap().insert(key, value);
+
     self
   }
 
