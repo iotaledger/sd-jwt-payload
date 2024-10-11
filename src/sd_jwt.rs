@@ -1,7 +1,6 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Deref;
@@ -20,6 +19,7 @@ use crate::SdObjectDecoder;
 use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
 use crate::SHA_ALG_NAME;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -192,7 +192,7 @@ impl FromStr for SdJwt {
 #[derive(Debug, Clone)]
 pub struct SdJwtPresentationBuilder {
   sd_jwt: SdJwt,
-  disclosures: HashMap<String, Disclosure>,
+  disclosures: IndexMap<String, Disclosure>,
   removed_disclosures: Vec<Disclosure>,
   object: Value,
 }
@@ -254,7 +254,7 @@ impl SdJwtPresentationBuilder {
 
     digests_to_remove
       .into_iter()
-      .flat_map(|digest| self.disclosures.remove(&digest))
+      .flat_map(|digest| self.disclosures.shift_remove(&digest))
       .for_each(|disclosure| self.removed_disclosures.push(disclosure));
 
     Ok(self)
@@ -309,7 +309,7 @@ impl SdJwtPresentationBuilder {
 fn conceal<'p, 'o, 'd, I>(
   object: &'o Value,
   mut path: Peekable<I>,
-  disclosures: &'d HashMap<String, Disclosure>,
+  disclosures: &'d IndexMap<String, Disclosure>,
 ) -> Result<Vec<&'o str>>
 where
   I: Iterator<Item = &'p str>,
@@ -381,7 +381,7 @@ where
 fn find_disclosure<'o>(
   object: &'o JsonObject,
   key: &str,
-  disclosures: &HashMap<String, Disclosure>,
+  disclosures: &IndexMap<String, Disclosure>,
 ) -> Option<&'o str> {
   let maybe_disclosable_array_entry = || {
     object
@@ -409,7 +409,7 @@ fn find_disclosure<'o>(
 
 fn get_all_sub_disclosures<'v, 'd>(
   start: &'v Value,
-  disclosures: &'d HashMap<String, Disclosure>,
+  disclosures: &'d IndexMap<String, Disclosure>,
 ) -> Box<dyn Iterator<Item = &'v str> + 'v>
 where
   'd: 'v,
