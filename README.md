@@ -36,15 +36,20 @@
 
 # SD-JWT Reference implementation
 
-Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 07**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html)
+Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 12**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-12.html)
 
 ## Overview
 
 This library supports 
-* **Encoding**:
-  - creating disclosers and replacing values in objects and arrays with the digest of their disclosure. 
-  - Adding decoys to objects and arrays.
-* **Decoding**  
+* **Issuing SD-JWTs**:
+  - Create a selectively disclosable JWT by choosing which properties can be concealed from a verifier.
+    Concealable claims are replaced with their disclosure's digest.
+  - Adding decoys to both JSON objects and arrays.
+  - Requiring an holder's key-bind.
+* **Managing SD-JWTs**  
+  - Conceal with ease any concealable property.
+  - Insert a key-bind.
+* **Verifying SD-JWTs**
   - Recursively replace digests in objects and arrays with their corresponding disclosure value.
 
 `Sha-256` hash function is shipped by default, encoding/decoding with other hash functions is possible. 
@@ -54,7 +59,7 @@ Include the library in your `cargo.toml`.
 
 ```bash
 [dependencies]
-sd-jwt-payload = { version = "0.2.1" }
+sd-jwt-payload = { version = "0.3.0" }
 ```
 
 ## Examples
@@ -64,153 +69,198 @@ See [sd_jwt.rs](./examples/sd_jwt.rs) for a runnable example.
 ## Usage
 
 This library consists of the major structs:
-1. [`SdObjectEncoder`](./src/encoder.rs): creates SD objects.
-2. [`SdObjectDecoder`](./src/decoder.rs): decodes SD objects.
-3. [`Disclosure`](./src/disclosure.rs): used by the `SdObjectEncoder` and `SdObjectDecoder` to represent a disclosure.
-3. [`SdJwt`](./src/sd_jwt.rs): creates/parses SD-JWTs.
-4. [`Hasher`](./src/hasher.rs): a trait to provide hash functions to the encoder/decoder.
+1. [`SdJwtBuilder`](./src/builder.rs): creates SD-JWTs.
+2. [`SdJwt`](./src/sd_jwt.rs): handles SD-JWTs.
+3. [`Disclosure`](./src/disclosure.rs): used throughout the library to represent disclosure objects.
+4. [`Hasher`](./src/hasher.rs): a trait to provide hash functions create and replace disclosures.
 5. [`Sha256Hasher`](./src/hasher.rs): implements `Hasher` for the `Sha-256` hash function.
+6. [`JwsSigner`](./src/signer.rs): a trait used to create JWS signatures.
 
 
-### Encoding
-Any JSON object can be encoded
-
+### Creation
+Any JSON object can be used to create an SD-JWT:
 
 ```rust
   let object = json!({
+    "sub": "user_42",
     "given_name": "John",
     "family_name": "Doe",
+    "email": "johndoe@example.com",
+    "phone_number": "+1-202-555-0101",
+    "phone_number_verified": true,
     "address": {
       "street_address": "123 Main St",
+      "locality": "Anytown",
       "region": "Anystate",
+      "country": "US"
     },
-    "phone": [
-      "+49 123456",
-      "+49 234567"
+    "birthdate": "1940-01-01",
+    "updated_at": 1570000000,
+    "nationalities": [
+      "US",
+      "DE"
     ]
   });
 ```
 
 
 ```rust
-  let mut encoder: SdObjectEncoder = object.try_into()?;
+  let builder: SdJwtBuilder = SdJwtBuilder::new(object);
 ```
-This creates a stateful encoder with `Sha-256` hash function by default to create disclosure digests. 
+This creates a stateful builder with `Sha-256` hash function by default to create disclosure digests. 
 
-*Note: `SdObjectEncoder` is generic over `Hasher` which allows custom encoding with other hash functions.*
+*Note: `SdJwtBuilder` is generic over `Hasher` which allows custom encoding with other hash functions.*
 
-The encoder can encode any of the object's values or array elements, using the `conceal` method. Suppose the value of `street_address` should be selectively disclosed as well as the value of `address` and the first `phone` value.
+The builder can encode any of the object's values or array elements, using the `make_concealable` method. Suppose the value of `street_address` in 'address' should be selectively disclosed as well as the entire value of `address` and the first `phone` value.
 
 
 ```rust
-  let disclosure1 = encoder.conceal("/address/street_address"], None)?;
-  let disclosure2 = encoder.conceal("/address", None)?;
-  let disclosure3 = encoder.conceal("/phone/0", None)?;
+  builder
+    .make_concealable("/email")?
+    .make_concealable("/phone_number")?
+    .make_concealable("/address/street_address")?
+    .make_concealable("/address")?
+    .make_concealable("/nationalities/0")?
 ```
 
-```
-"WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ"
-"WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0"
-"WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd"
-```
-*Note: the `conceal` method takes a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) to determine the element to conceal inside the JSON object.*
+*Note: the `make_concealable` method takes a [JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) to determine the element to conceal inside the JSON object.*
 
 
-The encoder also supports adding decoys. For instance, the amount of phone numbers and the amount of claims need to be hidden.
+The builder also supports adding decoys. For instance, the amount of phone numbers and the amount of claims need to be hidden.
 
 ```rust
-  encoder.add_decoys("/phone", 3).unwrap(); //Adds 3 decoys to the array `phone`.
-  encoder.add_decoys("", 6).unwrap(); // Adds 6 decoys to the top level object.
+  builder
+    .add_decoys("/nationalities", 1)? // Adds 1 decoys to the array `nationalities`.
+    .add_decoys("", 2)? // Adds 2 decoys to the top level object.
 ```
 
-Add the hash function claim.
+Through the builder an issuer can require a specific key-binding that will be verified upon validation:
+
 ```rust
-  encoder.add_sd_alg_property(); // This adds "_sd_alg": "sha-256"
+  builder
+    .require_key_binding(RequiredKeyBinding::Kid("key1".to_string()))
 ```
 
-Now `encoder.object()?` will return the encoded object.
+Internally, builder's object now looks like:
 
 ```json
 {
+  "_sd": [
+    "5P7JOl7w5kWrMDQ71U4ts1CHaPPNTKDqOt9OaOdGMOg",
+    "73rQnMSG1np-GjzaM-yHfcZAIqmeaIK9Dn9N0atxHms",
+    "s0UiQ41MTAPnjfKk4HEYet0ksuMo0VTArCwG5ALiC84",
+    "v-xRCoLxbDcL5NZGX9uRFI0hgH9gx3uX1Y1EMcWeC5k",
+    "z7SAFTHCOGF8vXbHyIPXH6TQvo750AdGXhvqgMTA8Mw"
+  ],
+  "_sd_alg": "sha-256",
+  "cnf": {
+    "kid": "key1"
+  },
+  "sub": "user_42",
   "given_name": "John",
   "family_name": "Doe",
-  "phone": [
+  "nationalities": [
     {
-      "...": "eZVn0KkQm_T8x-x57VxYt-_MmNG91Sh34E-bZEnNfWY"
+      "...": "xYpMTpfay0Rb77IWvbJU1C4JT3kvJUftZHxZuwfiS1M"
     },
-    "+49 234567",
+    "DE",
     {
-      "...": "KAiJIx0tktQRXBxZSBVVld9298bZIp2WkpkDYDa3CWQ"
-    },
-    {
-      "...": "CBKARPh6sdTCJyliZ7pBOYzix7Z4Bb4yRh0EykHX2Uw"
-    },
-    {
-      "...": "oi1KgsYXgqBFXUXvbVaHSGYYaWhkB5RL55T90Gl_5s0"
+      "...": "GqcdlPi6GUDcj9VVpm8kj29jfXCdyBx2GfWP34339hI"
     }
   ],
-  "_sd": [
-    "Jj5jBeGEawY6vRvmHDg55EjeAIP8FVhWEV2FczhUXrY",
-    "8eqphBPJyCBgUJhNWNP7ci-Y79N615wpZQrxi5D4ju8",
-    "_hOU5puJjNzSBhK0bwh3h8_b6H6nN7vd_7I0uTp80Mo",
-    "G_tH70MrfCkVM0HhsH9REObIt1Ei19477y6CEsS0Zlo",
-    "zP56MeH0ryjzqh9Kadrb5C9Z2BE2FWg8nb3g0rR3LSA",
-    "dgfVW11ip9OOyVi8M4h1RjXK8akw7ICeMQkjUwSI6iU",
-    "Bx33mOyTF5-w8gRS5yL4YQ4dig44V3lmHxk1WRss_7U"
-  ],
-  "_sd_alg": "sha-256"
+  "phone_number_verified": true,
+  "updated_at": 1570000000,
+  "birthdate": "1940-01-01"
 }
 ```
 
 *Note: no JWT claims like `exp` or `iat` are added. If necessary, these need to be added and validated manually.*
 
-### Creating SD-JWT
-
-Since creating JWTs is outside the scope of this library, see [sd_jwt.rs example](./examples/sd_jwt.rs) where `josekit` is used to create `jwt` with the object above as the claim set.
-
-Create SD-JWT
+To create the actual SD-JWT the `finish` method must be called on the builder:
 
 ```rust
-  let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
-  let sd_jwt: String = sd_jwt.presentation();
+  let signer = MyHS256Signer::new(); 
+  let sd_jwt = builder
+    // ...
+    .finish(&signer, "ES256")
+    .await?;
 ```
 
 ```
 eyJ0eXAiOiJTRC1KV1QiLCJhbGciOiJIUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwicGhvbmUiOlt7Ii4uLiI6ImVaVm4wS2tRbV9UOHgteDU3VnhZdC1fTW1ORzkxU2gzNEUtYlpFbk5mV1kifSwiKzQ5IDIzNDU2NyIseyIuLi4iOiJLQWlKSXgwdGt0UVJYQnhaU0JWVmxkOTI5OGJaSXAyV2twa0RZRGEzQ1dRIn0seyIuLi4iOiJDQktBUlBoNnNkVENKeWxpWjdwQk9Zeml4N1o0QmI0eVJoMEV5a0hYMlV3In0seyIuLi4iOiJvaTFLZ3NZWGdxQkZYVVh2YlZhSFNHWVlhV2hrQjVSTDU1VDkwR2xfNXMwIn1dLCJfc2QiOlsiSmo1akJlR0Vhd1k2dlJ2bUhEZzU1RWplQUlQOEZWaFdFVjJGY3poVVhyWSIsIjhlcXBoQlBKeUNCZ1VKaE5XTlA3Y2ktWTc5TjYxNXdwWlFyeGk1RDRqdTgiLCJfaE9VNXB1SmpOelNCaEswYndoM2g4X2I2SDZuTjd2ZF83STB1VHA4ME1vIiwiR190SDcwTXJmQ2tWTTBIaHNIOVJFT2JJdDFFaTE5NDc3eTZDRXNTMFpsbyIsInpQNTZNZUgwcnlqenFoOUthZHJiNUM5WjJCRTJGV2c4bmIzZzByUjNMU0EiLCJkZ2ZWVzExaXA5T095Vmk4TTRoMVJqWEs4YWt3N0lDZU1Ra2pVd1NJNmlVIiwiQngzM21PeVRGNS13OGdSUzV5TDRZUTRkaWc0NFYzbG1IeGsxV1Jzc183VSJdLCJfc2RfYWxnIjoic2hhLTI1NiJ9.knTqw4FMCplHoMu7mfiix7dv4lIjYgRIn-tmuemAhbY~WyJHaGpUZVYwV2xlUHE1bUNrVUtPVTkzcXV4WURjTzIiLCAic3RyZWV0X2FkZHJlc3MiLCAiMTIzIE1haW4gU3QiXQ~WyJVVXVBelg5RDdFV1g0c0FRVVM5aURLYVp3cU13blUiLCAiYWRkcmVzcyIsIHsicmVnaW9uIjoiQW55c3RhdGUiLCJfc2QiOlsiaHdiX2d0eG01SnhVbzJmTTQySzc3Q194QTUxcmkwTXF0TVVLZmI0ZVByMCJdfV0~WyJHRDYzSTYwUFJjb3dvdXJUUmg4OG5aM1JNbW14YVMiLCAiKzQ5IDEyMzQ1NiJd~
 ```
 
-### Decoding
+### Handling
 
-Parse the SD-JWT string to extract the JWT and the disclosures in order to decode the claims and construct the disclosed values.
-
-*Note: Validating the signature of the JWT and extracting the claim set is outside the scope of this library.
+Once an SD-JWT is obtained, any concealable property can be omitted from it by creating a presentation and calling the
+`conceal` method:
 
 ```rust
-  let sd_jwt: SdJwt = SdJwt::parse(sd_jwt_string)?;
-  let claims_set: // extract claims from `sd_jwt.jwt`.
-  let decoder = SdObjectDecoder::new();
-  let decoded_object = decoder.decode(claims_set, &sd_jwt.disclosures)?;
+  let mut sd_jwt = SdJwt::parse("...")?;
+  let hasher = Sha256Hasher::new();
+  let (presented_sd_jwt, removed_disclosures) = sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/email")?
+    .conceal("/nationalities/0")?
+    .finish()?;
 ```
-`decoded_object`:
+
+To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be used:
+
+```rust
+  let mut sd_jwt = SdJwt::parse("...")?;
+  // Can be used to check which key is required - if any.
+  let requird_kb: Option<&RequiredKeyBinding> = sd_jwt.required_key_binding();
+
+  let signer = MyJwkSigner::new();
+  let hasher = Sha256Hasher::new();
+  let kb_jwt = KeyBindingJwtBuilder::new()
+    .nonce("abcd-efgh-ijkl-mnop")
+    .iat(time::now())
+    .finish(&sd_jwt, &hasher, "ES256", &signer)
+    .await?;
+  
+  let (sd_jwt, _) = sd_jwt.into_presentation(&hasher)?
+    .attach_key_binding_jwt(kb_jwt)
+    .finish()?;
+```
+
+### Verifying
+
+The SD-JWT can be turned into a JSON object of its disclosed values by calling the `into_disclosed_object` method:
+
+```rust
+  let mut sd_jwt = SdJwt::parse("...")?;
+  let disclosed_object = sd_jwt.into_disclosed_object(&hasher)?;
+```
+`disclosed_object`:
 
 ```json
 {
-  "given_name": "John",
-  "family_name": "Doe",
-  "phone": [
-    "+49 123456",
-    "+49 234567"
-  ],
   "address": {
+    "country": "US",
+    "locality": "Anytown",
     "region": "Anystate",
     "street_address": "123 Main St"
-  }
+  },
+  "phone_number": "+1-202-555-0101",
+  "cnf": {
+    "kid": "key1"
+  },
+  "sub": "user_42",
+  "given_name": "John",
+  "family_name": "Doe",
+  "nationalities": [
+    "DE"
+  ],
+  "phone_number_verified": true,
+  "updated_at": 1570000000,
+  "birthdate": "1940-01-01"
 }
 
 ```
 
 Note:
-* `street_address` and `address` are recursively decoded.
 * `_sd_alg` property was removed.
 
 
