@@ -238,7 +238,7 @@ impl SdJwtPresentationBuilder {
     })
   }
 
-  /// Removes the disclosure for the property at `path`, conceiling it.
+  /// Removes the disclosure for the property at `path`, concealing it.
   ///
   /// ## Notes
   /// - When concealing a claim more than one disclosure may be removed: the disclosure for the claim itself and the
