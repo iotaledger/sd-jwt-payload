@@ -51,14 +51,17 @@ impl FromStr for KeyBindingJwt {
 }
 
 impl KeyBindingJwt {
+  /// Returns a [`KeyBindingJwtBuilder`] that allows the creation of a [`KeyBindingJwt`].
   pub fn builder() -> KeyBindingJwtBuilder {
     KeyBindingJwtBuilder::default()
   }
+  /// Returns a reference to this [`KeyBindingJwt`] claim set.
   pub fn claims(&self) -> &KeyBindingJwtClaims {
     &self.0.claims
   }
 }
 
+/// Builder-style struct to ease the creation of an [`KeyBindingJwt`].
 #[derive(Debug, Default, Clone)]
 pub struct KeyBindingJwtBuilder {
   header: JsonObject,
@@ -66,23 +69,32 @@ pub struct KeyBindingJwtBuilder {
 }
 
 impl KeyBindingJwtBuilder {
+  /// Creates a new [`KeyBindingJwtBuilder`].
   pub fn new() -> Self {
     Self::default()
   }
+
+  /// Creates a new [`KeyBindingJwtBuilder`] using `object` as its payload.
   pub fn from_object(object: JsonObject) -> Self {
     Self {
       header: JsonObject::default(),
       payload: object,
     }
   }
+
+  /// Sets the JWT's header.
   pub fn header(mut self, header: JsonObject) -> Self {
     self.header = header;
     self
   }
+
+  /// Sets the [iat](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.6) property.
   pub fn iat(mut self, iat: i64) -> Self {
     self.payload.insert("iat".to_string(), iat.into());
     self
   }
+
+  /// Sets the [aud](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.3) property.
   pub fn aud<'a, S>(mut self, aud: S) -> Self
   where
     S: Into<Cow<'a, str>>,
@@ -90,6 +102,8 @@ impl KeyBindingJwtBuilder {
     self.payload.insert("aud".to_string(), aud.into().into_owned().into());
     self
   }
+
+  /// Sets the `nonce` property.
   pub fn nonce<'a, S>(mut self, nonce: S) -> Self
   where
     S: Into<Cow<'a, str>>,
@@ -99,10 +113,14 @@ impl KeyBindingJwtBuilder {
       .insert("nonce".to_string(), nonce.into().into_owned().into());
     self
   }
+
+  /// Inserts a given property with key `name` and value `value` in the payload.
   pub fn insert_property(mut self, name: &str, value: Value) -> Self {
     self.payload.insert(name.to_string(), value);
     self
   }
+
+  /// Builds an [`KeyBindingJwt`] from the data provided to builder.
   pub async fn finish<S>(
     self,
     sd_jwt: &SdJwt,

@@ -88,7 +88,11 @@ impl SdObjectDecoder {
               output.insert(claim_name, recursively_decoded);
             }
           }
-          if output.get(DIGESTS_KEY).unwrap().is_array() {
+          if output
+            .get(DIGESTS_KEY)
+            .expect("output has a `DIGEST_KEY` property")
+            .is_array()
+          {
             output.remove(DIGESTS_KEY);
           }
         }

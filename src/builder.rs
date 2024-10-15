@@ -108,16 +108,21 @@ impl<H: Hasher> SdJwtBuilder<H> {
   }
 
   /// Adds a new claim to the underlying object.
-  pub fn insert_claim<'a, K, V>(mut self, key: K, value: V) -> Self
+  pub fn insert_claim<'a, K, V>(mut self, key: K, value: V) -> Result<Self>
   where
     K: Into<Cow<'a, str>>,
     V: Serialize,
   {
     let key = key.into().into_owned();
-    let value = serde_json::to_value(value).unwrap();
-    self.encoder.object.as_object_mut().unwrap().insert(key, value);
-
+    let value = serde_json::to_value(value).map_err(|e| Error::DeserializationError(e.to_string()))?;
     self
+      .encoder
+      .object
+      .as_object_mut()
+      .expect("encoder::object is a JSON Object")
+      .insert(key, value);
+
+    Ok(self)
   }
 
   /// Adds a decoy digest to the specified path.
@@ -157,7 +162,10 @@ impl<H: Hasher> SdJwtBuilder<H> {
     // Add key binding requirement as `cnf`.
     if let Some(key_bind) = key_bind {
       let key_bind = serde_json::to_value(key_bind).map_err(|e| Error::DeserializationError(e.to_string()))?;
-      object.as_object_mut().unwrap().insert("cnf".to_string(), key_bind);
+      object
+        .as_object_mut()
+        .expect("encoder::object is a JSON Object")
+        .insert("cnf".to_string(), key_bind);
     }
 
     // Check mandatory header properties or insert them.
@@ -173,7 +181,7 @@ impl<H: Hasher> SdJwtBuilder<H> {
     header.insert("alg".to_string(), Value::String(alg.to_string()));
 
     let jws = signer
-      .sign(&header, object.as_object().unwrap())
+      .sign(&header, object.as_object().expect("encoder::object is a JSON Object"))
       .await
       .map_err(|e| anyhow::anyhow!("jws failed: {e}"))
       .and_then(|jws_bytes| String::from_utf8(jws_bytes).context("invalid JWS"))
