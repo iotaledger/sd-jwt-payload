@@ -317,7 +317,7 @@ where
 {
   let element_key = path
     .next()
-    .ok_or_else(|| Error::InvalidPath("element at path doens't exist or is not disclosable".to_string()))?;
+    .ok_or_else(|| Error::InvalidPath("element at path doesn't exist or is not disclosable".to_string()))?;
   let has_next = path.peek().is_some();
   match object {
     // We are just traversing to a deeper part of the object.
