@@ -31,13 +31,13 @@ iota-crypto = { version = "0.23", default-features = false, features = [
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 json-pointer = "0.3.4"
 serde_with = "3.6.1"
-josekit = { version = "0.8.4", features = ["vendored"] }
 async-trait = "0.1.80"
 anyhow = "1"
 indexmap = "2"
 
 [dev-dependencies]
 tokio = { version = "1.38.1", features = ["macros", "rt-multi-thread"] }
+josekit = { version = "0.8.4", features = ["vendored"] }
 
 [[example]]
 name = "sd_jwt"
