@@ -10,7 +10,8 @@ use serde_json::Value;
 pub type JsonObject = Map<String, Value>;
 
 /// JSON Web Signature (JWS) Signer.
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait JwsSigner {
   type Error: Display;
   /// Creates a JWS. The algorithm used for signed must be read from `header.alg` property.
