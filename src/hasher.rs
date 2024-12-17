@@ -17,7 +17,7 @@ pub const SHA_ALG_NAME: &str = "sha-256";
 /// Implementations of this trait are expected only for algorithms listed in
 /// the IANA "Named Information Hash Algorithm" registry.
 /// See [Hash Function Claim](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#name-hash-function-claim)
-pub trait Hasher: Sync + Send {
+pub trait Hasher {
   /// Digests input to produce unique fixed-size hash value in bytes.
   fn digest(&self, input: &[u8]) -> Vec<u8>;
 
@@ -27,7 +27,7 @@ pub trait Hasher: Sync + Send {
   ///
   /// The hash algorithm identifier MUST be a hash algorithm value from the
   /// "Hash Name String" column in the IANA "Named Information Hash Algorithm"  
-  fn alg_name(&self) -> &'static str;
+  fn alg_name(&self) -> &str;
 
   /// Returns the base64url-encoded digest of a `disclosure`.
   fn encoded_digest(&self, disclosure: &str) -> String {
