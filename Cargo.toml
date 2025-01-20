@@ -1,30 +1,43 @@
 [package]
 name = "sd-jwt-payload"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["IOTA Stiftung"]
 homepage = "https://www.iota.org"
 license = "Apache-2.0"
 repository = "https://github.com/iotaledger/sd-jwt-payload"
-rust-version = "1.65"
 readme = "./README.md"
-description = "Rust implementation of the Selective Disclosure for JWTs (SD-JWT)"
+description = "Rust implementation of Selective Disclosure JWTs (SD-JWT)"
 keywords = ["sd-jwt", "selective-disclosure", "disclosure"]
 
 [dependencies]
 multibase = { version = "0.9", default-features = false, features = ["std"] }
-serde_json = { version = "1.0", default-features = false, features = ["std" ] }
-rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+rand = { version = "0.8.5", default-features = false, features = [
+    "std",
+    "std_rng",
+] }
 thiserror = { version = "1.0", default-features = false }
-strum = { version = "0.26", default-features = false, features = ["std", "derive"] }
-itertools = { version = "0.12", default-features = false, features = ["use_std"]  }
-iota-crypto = { version = "0.23", default-features = false, features = ["sha"], optional = true }
+strum = { version = "0.26", default-features = false, features = [
+    "std",
+    "derive",
+] }
+itertools = { version = "0.12", default-features = false, features = [
+    "use_std",
+] }
+iota-crypto = { version = "0.23", default-features = false, features = [
+    "sha",
+], optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 json-pointer = "0.3.4"
 serde_with = "3.6.1"
+async-trait = "0.1.80"
+anyhow = "1"
+indexmap = "2"
 
 [dev-dependencies]
-josekit = "0.8.4"
+tokio = { version = "1.38.1", features = ["macros", "rt-multi-thread"] }
+josekit = { version = "0.8.4", features = ["vendored"] }
 
 [[example]]
 name = "sd_jwt"

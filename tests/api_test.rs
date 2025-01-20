@@ -1,182 +1,67 @@
 // Copyright 2020-2024 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
-use josekit::jws::JwsAlgorithm;
+use async_trait::async_trait;
+use josekit::jws::alg::hmac::HmacJwsSigner;
 use josekit::jws::JwsHeader;
-use josekit::jws::JwsVerifier;
 use josekit::jws::HS256;
+use josekit::jwt;
 use josekit::jwt::JwtPayload;
-use josekit::jwt::{self};
+use sd_jwt_payload::Hasher;
+use sd_jwt_payload::JsonObject;
+use sd_jwt_payload::JwsSigner;
+use sd_jwt_payload::KeyBindingJwt;
+use sd_jwt_payload::Sha256Hasher;
 use serde_json::json;
-use serde_json::Map;
 use serde_json::Value;
 
-use sd_jwt_payload::Disclosure;
 use sd_jwt_payload::SdJwt;
-use sd_jwt_payload::SdObjectDecoder;
-use sd_jwt_payload::SdObjectEncoder;
+use sd_jwt_payload::SdJwtBuilder;
 
-#[test]
-fn test_complex_structure() {
-  // Values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#appendix-A.2
-  let object = json!({
-    "verified_claims": {
-      "verification": {
-        "trust_framework": "de_aml",
-        "time": "2012-04-23T18:25Z",
-        "verification_process": "f24c6f-6d3f-4ec5-973e-b0d8506f3bc7",
-        "evidence": [
-          {
-            "type": "document",
-            "method": "pipp",
-            "time": "2012-04-22T11:30Z",
-            "document": {
-              "type": "idcard",
-              "issuer": {
-                "name": "Stadt Augsburg",
-                "country": "DE"
-              },
-              "number": "53554554",
-              "date_of_issuance": "2010-03-23",
-              "date_of_expiry": "2020-03-22"
-            }
-          },
-          "evidence2"
-        ]
-      },
-      "claims": {
-        "given_name": "Max",
-        "family_name": "Müller",
-        "nationalities": [
-          "DE"
-        ],
-        "birthdate": "1956-01-28",
-        "place_of_birth": {
-          "country": "IS",
-          "locality": "Þykkvabæjarklaustur"
-        },
-        "address": {
-          "locality": "Maxstadt",
-          "postal_code": "12344",
-          "country": "DE",
-          "street_address": "Weidenstraße 22"
-        }
-      }
-    },
-    "birth_middle_name": "Timotheus",
-    "salutation": "Dr.",
-    "msisdn": "49123456789"
-  });
+const HMAC_SECRET: &[u8; 32] = b"0123456789ABCDEF0123456789ABCDEF";
 
-  let mut disclosures: Vec<Disclosure> = vec![];
-  let mut encoder = SdObjectEncoder::try_from(object.clone()).unwrap();
-  let disclosure = encoder.conceal("/verified_claims/verification/time", None);
-  disclosures.push(disclosure.unwrap());
+struct HmacSignerAdapter(HmacJwsSigner);
 
-  let disclosure = encoder.conceal("/verified_claims/verification/evidence/0/document/type", None);
-  disclosures.push(disclosure.unwrap());
+#[async_trait]
+impl JwsSigner for HmacSignerAdapter {
+  type Error = josekit::JoseError;
+  async fn sign(&self, header: &JsonObject, payload: &JsonObject) -> Result<Vec<u8>, Self::Error> {
+    let header = JwsHeader::from_map(header.clone())?;
+    let payload = JwtPayload::from_map(payload.clone())?;
 
-  let disclosure = encoder.conceal("/verified_claims/verification/evidence/1", None);
-  disclosures.push(disclosure.unwrap());
+    jwt::encode_with_signer(&payload, &header, &self.0).map(String::into_bytes)
+  }
+}
 
-  let disclosure = encoder.conceal("/verified_claims/verification/evidence", None);
-  disclosures.push(disclosure.unwrap());
-
-  let disclosure = encoder.conceal("/verified_claims/claims/place_of_birth/locality", None);
-  disclosures.push(disclosure.unwrap());
-
-  let disclosure = encoder.conceal("/verified_claims/claims", None);
-  disclosures.push(disclosure.unwrap());
-
-  println!(
-    "encoded object: {}",
-    serde_json::to_string_pretty(&encoder.object().unwrap()).unwrap()
-  );
-  // Create the JWT.
-  // Creating JWTs is out of the scope of this library, josekit is used here as an example
-  let mut header = JwsHeader::new();
-  header.set_token_type("SD-JWT");
-
-  // Use the encoded object as a payload for the JWT.
-  let payload = JwtPayload::from_map(encoder.object().unwrap().clone()).unwrap();
-  let key = b"0123456789ABCDEF0123456789ABCDEF";
-  let signer = HS256.signer_from_bytes(key).unwrap();
-  let jwt = jwt::encode_with_signer(&payload, &header, &signer).unwrap();
-
-  // Create an SD_JWT by collecting the disclosures and creating an `SdJwt` instance.
-  let disclosures: Vec<String> = disclosures
+async fn make_sd_jwt(object: Value, disclosable_values: impl IntoIterator<Item = &str>) -> SdJwt {
+  let signer = HmacSignerAdapter(HS256.signer_from_bytes(HMAC_SECRET).unwrap());
+  disclosable_values
     .into_iter()
-    .map(|disclosure| disclosure.to_string())
-    .collect();
-  let sd_jwt: SdJwt = SdJwt::new(jwt, disclosures.clone(), None);
-  let sd_jwt: String = sd_jwt.presentation();
+    .fold(SdJwtBuilder::new(object).unwrap(), |builder, path| {
+      builder.make_concealable(path).unwrap()
+    })
+    .finish(&signer, "HS256")
+    .await
+    .unwrap()
+}
 
-  // Decoding the SD-JWT
-  // Extract the payload from the JWT of the SD-JWT after verifying the signature.
-  let sd_jwt: SdJwt = SdJwt::parse(&sd_jwt).unwrap();
-  let verifier = HS256.verifier_from_bytes(key).unwrap();
-  let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &verifier).unwrap();
-
-  // Decode the payload by providing the disclosures that were parsed from the SD-JWT.
-  let decoder = SdObjectDecoder::new_with_sha256();
-
-  println!(
-    "claims: {}",
-    serde_json::to_string_pretty(payload.claims_set()).unwrap()
-  );
-  let decoded = decoder.decode(payload.claims_set(), &sd_jwt.disclosures).unwrap();
-  println!("decoded object: {}", serde_json::to_string_pretty(&decoded).unwrap());
-  assert_eq!(Value::Object(decoded), object);
+async fn make_kb_jwt(sd_jwt: &SdJwt, hasher: &dyn Hasher) -> KeyBindingJwt {
+  let signer = HmacSignerAdapter(HS256.signer_from_bytes(HMAC_SECRET).unwrap());
+  KeyBindingJwt::builder()
+    .nonce("abcdefghi")
+    .aud("https://example.com")
+    .iat(1458304832)
+    .finish(sd_jwt, hasher, "HS256", &signer)
+    .await
+    .unwrap()
 }
 
 #[test]
-fn concealed_object_in_array() {
-  let mut disclosures: Vec<Disclosure> = vec![];
-  let nested_object = json!({
-    "test1": 123,
-  });
-  let mut encoder = SdObjectEncoder::try_from(nested_object.clone()).unwrap();
-  let disclosure = encoder.conceal("/test1", None);
-  disclosures.push(disclosure.unwrap());
-
-  let object = json!({
-        "test2": [
-          "value1",
-          encoder.object().unwrap()
-        ]
-  });
-
-  let expected = json!({
-        "test2": [
-          "value1",
-          {
-           "test1": 123,
-          }
-        ]
-  });
-  let mut encoder = SdObjectEncoder::try_from(object.clone()).unwrap();
-  let disclosure = encoder.conceal("/test2/0", None);
-  disclosures.push(disclosure.unwrap());
-  let disclosure = encoder.conceal("/test2", None);
-  disclosures.push(disclosure.unwrap());
-
-  let disclosures: Vec<String> = disclosures
-    .into_iter()
-    .map(|disclosure| disclosure.to_string())
-    .collect();
-  let decoder = SdObjectDecoder::new_with_sha256();
-  let decoded = decoder.decode(encoder.object().unwrap(), &disclosures).unwrap();
-  assert_eq!(Value::Object(decoded), expected);
-}
-
-#[test]
-fn decode() {
+fn simple_sd_jwt() {
   // Values taken from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-06.html#name-example-2-handling-structur
-  let sd_jwt = "eyJhbGciOiAiRVMyNTYifQ.eyJfc2QiOiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1FyazFXSF84YmR3T0FfWVVyVW5HUVUiLCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZzZKMmtTZnFZUkJlb3d2RSIsICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZkx2S2hoX2ZfOWFZIiwgIlg2WkFZT0lJMnZQTjQwVjd4RXhad1Z3ejd5Um1MTmNWd3Q1REw4Ukx2NGciLCAiWTM0em1JbzBRTExPdGRNcFhHd2pCZ0x2cjE3eUVoaFlUMEZHb2ZSLWFJRSIsICJmeUdwMFdUd3dQdjJKRFFsbjFsU2lhZW9iWnNNV0ExMGJRNTk4OS05RFRzIiwgIm9tbUZBaWNWVDhMR0hDQjB1eXd4N2ZZdW8zTUhZS08xNWN6LVJaRVlNNVEiLCAiczBCS1lzTFd4UVFlVTh0VmxsdE03TUtzSVJUckVJYTFQa0ptcXhCQmY1VSJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAiYWRkcmVzcyI6IHsiX3NkIjogWyI2YVVoelloWjdTSjFrVm1hZ1FBTzN1MkVUTjJDQzFhSGhlWnBLbmFGMF9FIiwgIkF6TGxGb2JrSjJ4aWF1cFJFUHlvSnotOS1OU2xkQjZDZ2pyN2ZVeW9IemciLCAiUHp6Y1Z1MHFiTXVCR1NqdWxmZXd6a2VzRDl6dXRPRXhuNUVXTndrclEtayIsICJiMkRrdzBqY0lGOXJHZzhfUEY4WmN2bmNXN3p3Wmo1cnlCV3ZYZnJwemVrIiwgImNQWUpISVo4VnUtZjlDQ3lWdWIyVWZnRWs4anZ2WGV6d0sxcF9KbmVlWFEiLCAiZ2xUM2hyU1U3ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25VbGRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0MG9pZEVlVnNBIiwgInVOSG9XWWhYc1poVkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R3JNWDQiXX0sICJfc2RfYWxnIjogInNoYS0yNTYifQ.IjE4EfnYu1RZ1uz6yqtFh5Lppq36VC4VeSr-hLDFpZ9zqBNmMrT5JHLLXTuMJqKQp3NIzDsLaft4GK5bYyfqhg~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInJlZ2lvbiIsICJcdTZlMmZcdTUzM2EiXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~";
+  let sd_jwt = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1FyazFXSF84YmR3T0FfWVVyVW5HUVUiLCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZzZKMmtTZnFZUkJlb3d2RSIsICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZkx2S2hoX2ZfOWFZIiwgIlg2WkFZT0lJMnZQTjQwVjd4RXhad1Z3ejd5Um1MTmNWd3Q1REw4Ukx2NGciLCAiWTM0em1JbzBRTExPdGRNcFhHd2pCZ0x2cjE3eUVoaFlUMEZHb2ZSLWFJRSIsICJmeUdwMFdUd3dQdjJKRFFsbjFsU2lhZW9iWnNNV0ExMGJRNTk4OS05RFRzIiwgIm9tbUZBaWNWVDhMR0hDQjB1eXd4N2ZZdW8zTUhZS08xNWN6LVJaRVlNNVEiLCAiczBCS1lzTFd4UVFlVTh0VmxsdE03TUtzSVJUckVJYTFQa0ptcXhCQmY1VSJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAiYWRkcmVzcyI6IHsiX3NkIjogWyI2YVVoelloWjdTSjFrVm1hZ1FBTzN1MkVUTjJDQzFhSGhlWnBLbmFGMF9FIiwgIkF6TGxGb2JrSjJ4aWF1cFJFUHlvSnotOS1OU2xkQjZDZ2pyN2ZVeW9IemciLCAiUHp6Y1Z1MHFiTXVCR1NqdWxmZXd6a2VzRDl6dXRPRXhuNUVXTndrclEtayIsICJiMkRrdzBqY0lGOXJHZzhfUEY4WmN2bmNXN3p3Wmo1cnlCV3ZYZnJwemVrIiwgImNQWUpISVo4VnUtZjlDQ3lWdWIyVWZnRWs4anZ2WGV6d0sxcF9KbmVlWFEiLCAiZ2xUM2hyU1U3ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25VbGRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0MG9pZEVlVnNBIiwgInVOSG9XWWhYc1poVkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R3JNWDQiXX0sICJfc2RfYWxnIjogInNoYS0yNTYifQ.gR6rSL7urX79CNEvTQnP1MH5xthG11ucIV44SqKFZ4Pvlu_u16RfvXQd4k4CAIBZNKn2aTI18TfvFwV97gJFoA~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgInJlZ2lvbiIsICJcdTZlMmZcdTUzM2EiXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~";
   let sd_jwt: SdJwt = SdJwt::parse(sd_jwt).unwrap();
-  let (payload, _header) = jwt::decode_with_verifier(&sd_jwt.jwt, &DecoyJwsVerifier {}).unwrap();
-  let decoder = SdObjectDecoder::new_with_sha256();
-  let decoded: Map<String, Value> = decoder.decode(payload.claims_set(), &sd_jwt.disclosures).unwrap();
+  let disclosed = sd_jwt.into_disclosed_object(&Sha256Hasher::new()).unwrap();
   let expected_object = json!({
     "address": {
       "country": "JP",
@@ -186,42 +71,79 @@ fn decode() {
     "iat": 1683000000,
     "exp": 1883000000
   }
+  );
+  assert_eq!(expected_object.as_object().unwrap(), &disclosed);
+}
+
+#[tokio::test]
+async fn concealing_parent_also_removes_all_sub_disclosures() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(
+    json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}),
+    ["/parent/property1", "/parent/property2/0", "/parent"],
   )
-  .as_object()
-  .unwrap()
-  .clone();
-  assert_eq!(expected_object, decoded);
+  .await;
+
+  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish()?.1;
+  assert_eq!(removed_disclosures.len(), 3);
+
+  Ok(())
 }
 
-// Boilerplate to allow extracting JWS payload without verifying the signature.
-#[derive(Debug, Clone)]
-struct DecoyJwsAlgorithm;
-impl JwsAlgorithm for DecoyJwsAlgorithm {
-  fn name(&self) -> &str {
-    "ES256"
-  }
+#[tokio::test]
+async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(
+    json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}),
+    ["/parent/property1", "/parent/property2/0", "/parent"],
+  )
+  .await;
 
-  fn box_clone(&self) -> Box<dyn JwsAlgorithm> {
-    Box::new(self.clone())
-  }
+  sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/parent/property2/0")?
+    .finish()?;
+
+  Ok(())
 }
 
-#[derive(Debug, Clone)]
-struct DecoyJwsVerifier;
-impl JwsVerifier for DecoyJwsVerifier {
-  fn algorithm(&self) -> &dyn josekit::jws::JwsAlgorithm {
-    &DecoyJwsAlgorithm {}
-  }
+#[tokio::test]
+async fn sd_jwt_is_verifiable() -> anyhow::Result<()> {
+  let sd_jwt = make_sd_jwt(json!({"key": "value"}), []).await;
+  let jwt = sd_jwt.presentation().split_once('~').unwrap().0.to_string();
+  let verifier = HS256.verifier_from_bytes(HMAC_SECRET)?;
 
-  fn key_id(&self) -> Option<&str> {
-    None
-  }
+  josekit::jwt::decode_with_verifier(&jwt, &verifier)?;
+  Ok(())
+}
 
-  fn verify(&self, _message: &[u8], _signature: &[u8]) -> Result<(), josekit::JoseError> {
-    Ok(())
-  }
+#[tokio::test]
+async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}), []).await;
+  // Try to serialize & deserialize `sd_jwt`.
+  let sd_jwt = {
+    let s = sd_jwt.to_string();
+    s.parse::<SdJwt>()?
+  };
 
-  fn box_clone(&self) -> Box<dyn JwsVerifier> {
-    Box::new(self.clone())
-  }
+  assert!(sd_jwt.disclosures().is_empty());
+  assert!(sd_jwt.key_binding_jwt().is_none());
+
+  let with_kb = sd_jwt
+    .clone()
+    .into_presentation(&hasher)?
+    .attach_key_binding_jwt(make_kb_jwt(&sd_jwt, &hasher).await)
+    .finish()?
+    .0;
+  // Try to serialize & deserialize `with_kb`.
+  let with_kb = {
+    let s = with_kb.to_string();
+    s.parse::<SdJwt>()?
+  };
+
+  assert!(with_kb.disclosures().is_empty());
+  assert!(with_kb.key_binding_jwt().is_some());
+
+  Ok(())
 }

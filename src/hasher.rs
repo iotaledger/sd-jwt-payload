@@ -6,6 +6,7 @@ use crypto::hashes::sha::SHA256;
 
 #[cfg(feature = "sha")]
 use crypto::hashes::sha::SHA256_LEN;
+use multibase::Base;
 
 pub const SHA_ALG_NAME: &str = "sha-256";
 
@@ -16,7 +17,7 @@ pub const SHA_ALG_NAME: &str = "sha-256";
 /// Implementations of this trait are expected only for algorithms listed in
 /// the IANA "Named Information Hash Algorithm" registry.
 /// See [Hash Function Claim](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#name-hash-function-claim)
-pub trait Hasher: Sync + Send {
+pub trait Hasher {
   /// Digests input to produce unique fixed-size hash value in bytes.
   fn digest(&self, input: &[u8]) -> Vec<u8>;
 
@@ -26,17 +27,17 @@ pub trait Hasher: Sync + Send {
   ///
   /// The hash algorithm identifier MUST be a hash algorithm value from the
   /// "Hash Name String" column in the IANA "Named Information Hash Algorithm"  
-  fn alg_name(&self) -> &'static str;
+  fn alg_name(&self) -> &str;
 
   /// Returns the base64url-encoded digest of a `disclosure`.
   fn encoded_digest(&self, disclosure: &str) -> String {
     let hash = self.digest(disclosure.as_bytes());
-    multibase::Base::Base64Url.encode(hash)
+    Base::Base64Url.encode(hash)
   }
 }
 
 /// An implementation of [`Hasher`] that uses the `sha-256` hash function.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 #[cfg(feature = "sha")]
 pub struct Sha256Hasher;
 

@@ -4,14 +4,14 @@
 /// Alias for a `Result` with the error type [`Error`].
 pub type Result<T> = ::core::result::Result<T, Error>;
 
-#[derive(Debug, thiserror::Error, strum::IntoStaticStr)]
+#[derive(Debug, thiserror::Error, strum::IntoStaticStr, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
   #[error("invalid input: {0}")]
   InvalidDisclosure(String),
 
-  #[error("no hasher can be specified for the hashing algorithm {0}")]
-  MissingHasher(String),
+  #[error("invalid hasher: {0}")]
+  InvalidHasher(String),
 
   #[error("data type is not expected: {0}")]
   DataTypeMismatch(String),
@@ -39,4 +39,10 @@ pub enum Error {
 
   #[error("the validation ended with {0} unused disclosure(s)")]
   UnusedDisclosures(usize),
+
+  #[error("JWS creation failure: {0}")]
+  JwsSignerFailure(String),
+
+  #[error("Missing required KB-JWT")]
+  MissingKeyBindingJwt,
 }
