@@ -1,8 +1,8 @@
 // Copyright 2020-2023 IOTA Stiftung
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
 use std::fmt::Display;
-use std::iter::Peekable;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
@@ -193,7 +193,7 @@ impl FromStr for SdJwt {
 pub struct SdJwtPresentationBuilder {
   sd_jwt: SdJwt,
   disclosures: IndexMap<String, Disclosure>,
-  removed_disclosures: Vec<Disclosure>,
+  disclosures_to_omit: HashSet<usize>,
   object: Value,
 }
 
@@ -233,7 +233,7 @@ impl SdJwtPresentationBuilder {
     Ok(Self {
       sd_jwt,
       disclosures,
-      removed_disclosures: vec![],
+      disclosures_to_omit: HashSet::default(),
       object,
     })
   }
@@ -244,19 +244,36 @@ impl SdJwtPresentationBuilder {
   /// - When concealing a claim more than one disclosure may be removed: the disclosure for the claim itself and the
   ///   disclosures for any concealable sub-claim.
   pub fn conceal(mut self, path: &str) -> Result<Self> {
-    let path_segments = path.trim_start_matches('/').split('/').peekable();
-    let digests_to_remove = conceal(&self.object, path_segments, &self.disclosures)?
-      .into_iter()
-      // needed, since some strings are borrowed for the lifetime of the borrow of `self.disclosures`.
-      .map(ToOwned::to_owned)
-      // needed, to drop borrow `self.disclosures`.
-      .collect_vec();
+    self
+      .disclosures_to_omit
+      .extend(find_disclosure_and_sub_disclosures_for_value_at_path(
+        &self.object,
+        path,
+        &self.disclosures,
+      )?);
+    Ok(self)
+  }
 
-    digests_to_remove
-      .into_iter()
-      .flat_map(|digest| self.disclosures.shift_remove(&digest))
-      .for_each(|disclosure| self.removed_disclosures.push(disclosure));
+  /// Removes all disclosures from this SD-JWT, resulting in a token that,
+  /// when presented, will have *all* selectively-disclosable properties
+  /// omitted.
+  pub fn conceal_all(mut self) -> Self {
+    self.disclosures_to_omit.extend(0..self.disclosures.len());
+    self
+  }
 
+  /// Discloses a value that was previously concealed.
+  /// # Notes
+  /// - This method may disclose multiple values, if the given path references a disclosable value stored within another
+  ///   disclosable value. That is, [disclose](Self::disclose) will unconceal the selectively disclosable value at
+  ///   `path` together with *all* its parents that are disclosable values themselves.
+  /// - By default *all* disclosable claims are disclosed, therefore this method can only be used to *undo* any
+  ///   concealment operations previously performed by either [Self::conceal] or [Self::conceal_all].
+  pub fn disclose(mut self, path: &str) -> Result<Self> {
+    let disclosing = find_disclosure_and_parent_disclosures_for_value_at_path(&self.object, path, &self.disclosures)?;
+    for idx in disclosing {
+      self.disclosures_to_omit.remove(&idx);
+    }
     Ok(self)
   }
 
@@ -278,11 +295,20 @@ impl SdJwtPresentationBuilder {
     let SdJwtPresentationBuilder {
       mut sd_jwt,
       disclosures,
-      removed_disclosures,
+      disclosures_to_omit,
       object,
       ..
     } = self;
-    sd_jwt.disclosures = disclosures.into_values().collect_vec();
+
+    let mut disclosures_to_keep = vec![];
+    let mut omitted_disclosures = vec![];
+    for (idx, disclosure) in disclosures.into_values().enumerate() {
+      if disclosures_to_omit.contains(&idx) {
+        omitted_disclosures.push(disclosure);
+      } else {
+        disclosures_to_keep.push(disclosure);
+      }
+    }
 
     let Value::Object(mut obj) = object else {
       unreachable!();
@@ -301,94 +327,42 @@ impl SdJwtPresentationBuilder {
       })
       .collect();
     sd_jwt.jwt.claims.properties = obj;
+    sd_jwt.disclosures = disclosures_to_keep;
 
-    Ok((sd_jwt, removed_disclosures))
+    Ok((sd_jwt, omitted_disclosures))
   }
 }
 
-fn conceal<'p, 'o, 'd, I>(
-  object: &'o Value,
-  mut path: Peekable<I>,
-  disclosures: &'d IndexMap<String, Disclosure>,
-) -> Result<Vec<&'o str>>
-where
-  I: Iterator<Item = &'p str>,
-  'd: 'o,
-{
-  let element_key = path
-    .next()
-    .ok_or_else(|| Error::InvalidPath("element at path doesn't exist or is not disclosable".to_string()))?;
-  let has_next = path.peek().is_some();
-  match object {
-    // We are just traversing to a deeper part of the object.
-    Value::Object(object) if has_next => {
-      let next_object = object
-        .get(element_key)
-        .or_else(|| {
-          find_disclosure(object, element_key, disclosures)
-            .and_then(|digest| disclosures.get(digest))
-            .map(|disclosure| &disclosure.claim_value)
-        })
-        .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_string()))?;
+fn find_disclosure_and_sub_disclosures_for_value_at_path<'a>(
+  value: &'a Value,
+  path: &str,
+  disclosures: &'a IndexMap<String, Disclosure>,
+) -> Result<Vec<usize>> {
+  let path_segments = path.trim_start_matches('/').split('/').collect_vec();
+  let (value, mut visited_disclosures) = traverse_disclosable_object(value, &path_segments, disclosures)
+    .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_owned()))?;
+  let path_referenced_disclosure = visited_disclosures
+    .pop()
+    .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_owned()))?;
 
-      conceal(next_object, path, disclosures)
-    }
-    // We reached the parent of the value we want to conceal.
-    // Make sure its concealable by finding its disclosure.
-    Value::Object(object) => {
-      let digest = find_disclosure(object, element_key, disclosures)
-        .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_string()))?;
-      let disclosure = disclosures.get(digest).unwrap();
-      let mut sub_disclosures: Vec<&str> = get_all_sub_disclosures(&disclosure.claim_value, disclosures).collect();
-      sub_disclosures.push(digest);
-      Ok(sub_disclosures)
-    }
-    // Traversing an array
-    Value::Array(arr) if has_next => {
-      let index = element_key
-        .parse::<usize>()
-        .ok()
-        .filter(|idx| arr.len() > *idx)
-        .ok_or_else(|| Error::InvalidPath(String::default()))?;
-      let next_object = arr
-        .get(index)
-        .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_string()))?;
+  let mut disclosures_to_omit = get_all_sub_disclosures(value, disclosures);
+  disclosures_to_omit.push(path_referenced_disclosure);
 
-      conceal(next_object, path, disclosures)
-    }
-    // Concealing an array's entry.
-    Value::Array(arr) => {
-      let index = element_key
-        .parse::<usize>()
-        .ok()
-        .filter(|idx| arr.len() > *idx)
-        .ok_or_else(|| Error::InvalidPath(String::default()))?;
-      let digest = arr
-        .get(index)
-        .unwrap()
-        .as_object()
-        .and_then(|entry| find_disclosure(entry, "", disclosures))
-        .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_string()))?;
-      let disclosure = disclosures.get(digest).unwrap();
-      let mut sub_disclosures: Vec<&str> = get_all_sub_disclosures(&disclosure.claim_value, disclosures).collect();
-      sub_disclosures.push(digest);
-      Ok(sub_disclosures)
-    }
-    _ => Err(Error::InvalidPath(String::default())),
-  }
+  Ok(disclosures_to_omit)
 }
 
-fn find_disclosure<'o>(
-  object: &'o JsonObject,
-  key: &str,
-  disclosures: &IndexMap<String, Disclosure>,
-) -> Option<&'o str> {
-  let maybe_disclosable_array_entry = || {
-    object
-      .get(ARRAY_DIGEST_KEY)
-      .and_then(|value| value.as_str())
-      .filter(|_| object.len() == 1)
-  };
+fn find_disclosure_and_parent_disclosures_for_value_at_path<'a>(
+  value: &'a Value,
+  path: &str,
+  disclosures: &'a IndexMap<String, Disclosure>,
+) -> Result<Vec<usize>> {
+  let path_segments = path.trim_start_matches('/').split('/').collect_vec();
+  traverse_disclosable_object(value, &path_segments, disclosures)
+    .map(|(_, disclosures)| disclosures)
+    .ok_or_else(|| Error::InvalidPath("the referenced element doesn't exist or is not concealable".to_owned()))
+}
+
+fn find_disclosure(object: &JsonObject, key: &str, disclosures: &IndexMap<String, Disclosure>) -> Option<usize> {
   // Try to find the digest for disclosable property `key` in
   // the `_sd` field of `object`.
   object
@@ -403,50 +377,120 @@ fn find_disclosure<'o>(
         .and_then(|disclosure| disclosure.claim_name.as_deref())
         .is_some_and(|name| name == key)
     })
-    // If no result is found try checking `object` as a disclosable array entry.
-    .or_else(maybe_disclosable_array_entry)
+    .and_then(|digest| disclosures.get_index_of(digest))
 }
 
-fn get_all_sub_disclosures<'v, 'd>(
-  start: &'v Value,
-  disclosures: &'d IndexMap<String, Disclosure>,
-) -> Box<dyn Iterator<Item = &'v str> + 'v>
-where
-  'd: 'v,
-{
-  match start {
-    // `start` is a JSON object, check if it has a "_sd" array + recursively
-    // check all its properties
+fn traverse_disclosable_object<'a>(
+  mut value: &'a Value,
+  path: &[&str],
+  disclosures: &'a IndexMap<String, Disclosure>,
+) -> Option<(&'a Value, Vec<usize>)> {
+  let mut visited_disclosures = vec![];
+  for path_segment in path {
+    let step = traverse_disclosable_object_step(value, path_segment, disclosures)?;
+    value = step.value;
+    if let Some(disclosure) = step.disclosure {
+      visited_disclosures.push(disclosure)
+    }
+  }
+
+  Some((value, visited_disclosures))
+}
+
+fn traverse_disclosable_object_step<'a>(
+  value: &'a Value,
+  path_fragment: &str,
+  disclosures: &'a IndexMap<String, Disclosure>,
+) -> Option<TraversalResult<'a>> {
+  match value {
+    // Object has an entry for the element we are searching.
+    Value::Object(object) if object.contains_key(path_fragment) => {
+      Some(TraversalResult::new_value(object.get(path_fragment).unwrap()))
+    }
+    // No entry for path fragment, searching object's disclosures.
     Value::Object(object) => {
-      let direct_sds = object
+      let idx = find_disclosure(object, path_fragment, disclosures)?;
+      let (_, disclosure) = disclosures.get_index(idx).unwrap();
+      Some(TraversalResult::new_from_disclosure(idx, disclosure))
+    }
+    Value::Array(array) => {
+      let arr_idx = path_fragment.parse::<usize>().ok()?;
+      let value = array.get(arr_idx)?;
+
+      // Check if the value is a disclosable value.
+      if let Some(digest) = value.get(ARRAY_DIGEST_KEY).and_then(|value| value.as_str()) {
+        disclosures
+          .get_full(digest)
+          .map(|(idx, _, disclosure)| TraversalResult::new_from_disclosure(idx, disclosure))
+      } else {
+        Some(TraversalResult::new_value(value))
+      }
+    }
+    _ => None,
+  }
+}
+
+/// The result of a step in the traversal of a disclosable value.
+#[derive(Debug)]
+struct TraversalResult<'a> {
+  /// The reached value.
+  value: &'a Value,
+  /// The index of the disclosure we had to walk through to reach `value`.
+  disclosure: Option<usize>,
+}
+
+impl<'a> TraversalResult<'a> {
+  fn new_value(value: &'a Value) -> Self {
+    Self {
+      value,
+      disclosure: None,
+    }
+  }
+
+  fn new_from_disclosure(idx: usize, disclosure: &'a Disclosure) -> Self {
+    Self {
+      value: &disclosure.claim_value,
+      disclosure: Some(idx),
+    }
+  }
+}
+
+fn get_all_sub_disclosures<'a>(value: &'a Value, disclosures: &'a IndexMap<String, Disclosure>) -> Vec<usize> {
+  let mut sub_disclosures = vec![];
+  match value {
+    Value::Object(object) => {
+      // Check object's "_sd" entry.
+      object
         .get(DIGESTS_KEY)
         .and_then(|sd| sd.as_array())
         .map(|sd| sd.iter())
         .unwrap_or_default()
         .flat_map(|value| value.as_str())
-        .filter(|digest| disclosures.contains_key(*digest));
-      let sub_sds = object
-        .values()
-        .flat_map(|value| get_all_sub_disclosures(value, disclosures));
-      Box::new(itertools::chain!(direct_sds, sub_sds))
+        .filter_map(|digest| disclosures.get_index_of(digest))
+        .for_each(|idx| sub_disclosures.push(idx));
+      // Recursively check all object's property.
+      object.values().for_each(|value| {
+        let found_sub_disclosures = get_all_sub_disclosures(value, disclosures);
+        sub_disclosures.extend(found_sub_disclosures);
+      });
     }
-    // `start` is a JSON array, check for disclosable values `{"...", <digest>}` +
-    // recursively check all its values.
     Value::Array(arr) => {
-      let mut digests = vec![];
-      for value in arr {
-        if let Some(Value::String(digest)) = value.get(ARRAY_DIGEST_KEY) {
-          if disclosures.contains_key(digest) {
-            digests.push(digest.as_str());
-          }
+      for value in arr.iter().filter(|value| value.is_object()) {
+        if let Some(idx) = value
+          .get(ARRAY_DIGEST_KEY)
+          .and_then(|value| value.as_str())
+          .and_then(|digest| disclosures.get_index_of(digest))
+        {
+          sub_disclosures.push(idx);
         } else {
-          get_all_sub_disclosures(value, disclosures).for_each(|digest| digests.push(digest));
+          sub_disclosures.extend(get_all_sub_disclosures(value, disclosures));
         }
       }
-      Box::new(digests.into_iter())
     }
-    _ => Box::new(std::iter::empty()),
+    _ => (),
   }
+
+  sub_disclosures
 }
 
 #[cfg(test)]

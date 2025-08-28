@@ -108,6 +108,42 @@ async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> 
 }
 
 #[tokio::test]
+async fn conceal_all_works() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(json!({"key1": "value1", "key2": "value2"}), ["/key1", "/key2"]).await;
+
+  let (_, omitted_disclosures) = sd_jwt.into_presentation(&hasher)?.conceal_all().finish()?;
+
+  assert_eq!(omitted_disclosures.len(), 2);
+
+  Ok(())
+}
+
+#[tokio::test]
+async fn disclose_works() -> anyhow::Result<()> {
+  let hasher = Sha256Hasher::new();
+  let sd_jwt = make_sd_jwt(
+    json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}),
+    ["/parent/property1", "/parent/property2/0", "/parent"],
+  )
+  .await;
+
+  let (presented_token, mut omitted_disclosures) = sd_jwt
+    .into_presentation(&hasher)?
+    .conceal_all()
+    .disclose("/parent/property1")?
+    .finish()?;
+
+  assert_eq!(
+    omitted_disclosures.pop().map(|d| d.claim_value),
+    Some(Value::Number(1.into()))
+  );
+  assert_eq!(presented_token.disclosures().len(), 2);
+
+  Ok(())
+}
+
+#[tokio::test]
 async fn sd_jwt_is_verifiable() -> anyhow::Result<()> {
   let sd_jwt = make_sd_jwt(json!({"key": "value"}), []).await;
   let jwt = sd_jwt.presentation().split_once('~').unwrap().0.to_string();
