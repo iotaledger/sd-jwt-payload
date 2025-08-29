@@ -20,6 +20,7 @@ use crate::ARRAY_DIGEST_KEY;
 use crate::DIGESTS_KEY;
 use crate::SHA_ALG_NAME;
 use indexmap::IndexMap;
+use itertools::Either;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -300,15 +301,17 @@ impl SdJwtPresentationBuilder {
       ..
     } = self;
 
-    let mut disclosures_to_keep = vec![];
-    let mut omitted_disclosures = vec![];
-    for (idx, disclosure) in disclosures.into_values().enumerate() {
-      if disclosures_to_omit.contains(&idx) {
-        omitted_disclosures.push(disclosure);
-      } else {
-        disclosures_to_keep.push(disclosure);
-      }
-    }
+    let (disclosures_to_keep, omitted_disclosures) =
+      disclosures
+        .into_values()
+        .enumerate()
+        .partition_map(|(idx, disclosure)| {
+          if disclosures_to_omit.contains(&idx) {
+            Either::Left(disclosure)
+          } else {
+            Either::Right(disclosure)
+          }
+        });
 
     let Value::Object(mut obj) = object else {
       unreachable!();
