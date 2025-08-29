@@ -307,9 +307,9 @@ impl SdJwtPresentationBuilder {
         .enumerate()
         .partition_map(|(idx, disclosure)| {
           if disclosures_to_omit.contains(&idx) {
-            Either::Left(disclosure)
-          } else {
             Either::Right(disclosure)
+          } else {
+            Either::Left(disclosure)
           }
         });
 
