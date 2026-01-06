@@ -52,7 +52,7 @@ impl DerefMut for SdJwtClaims {
 }
 
 /// Representation of an SD-JWT of the format
-/// `<Issuer-signed JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>`.
+/// `<Issuer-signed JWT>~<D.1>~<D.2>~...~<D.N>~<optional KB-JWT>`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SdJwt {
   /// The JWT part.
@@ -93,22 +93,22 @@ impl SdJwt {
     &mut self.jwt.claims
   }
 
+  /// Returns the disclosures of this SD-JWT.
   pub fn disclosures(&self) -> &[Disclosure] {
     &self.disclosures
   }
 
+  /// Returns the required key binding of this SD-JWT, if any.
   pub fn required_key_bind(&self) -> Option<&RequiredKeyBinding> {
     self.claims().cnf.as_ref()
   }
 
+  /// Returns the key binding JWT of this SD-JWT, if any.
   pub fn key_binding_jwt(&self) -> Option<&KeyBindingJwt> {
     self.key_binding_jwt.as_ref()
   }
 
   /// Serializes the components into the final SD-JWT.
-  ///
-  /// ## Error
-  /// Returns [`Error::DeserializationError`] if parsing fails.
   pub fn presentation(&self) -> String {
     let disclosures = self.disclosures.iter().map(ToString::to_string).join("~");
     let key_bindings = self

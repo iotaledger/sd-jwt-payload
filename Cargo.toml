@@ -28,9 +28,8 @@ itertools = { version = "0.12", default-features = false, features = [
 iota-crypto = { version = "0.23", default-features = false, features = [
     "sha",
 ], optional = true }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 json-pointer = "0.3.4"
-serde_with = "3.6.1"
 async-trait = "0.1.80"
 anyhow = "1"
 indexmap = "2"

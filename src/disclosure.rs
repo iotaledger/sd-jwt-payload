@@ -9,7 +9,7 @@ use std::fmt::Display;
 /// A disclosable value.
 /// Both object properties and array elements disclosures are supported.
 ///
-/// See: https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-07.html#name-disclosures
+/// See: [RFC 9901 - Disclosures](https://www.rfc-editor.org/rfc/rfc9901.html#name-disclosures).
 #[derive(Debug, Clone, Eq)]
 pub struct Disclosure {
   /// The salt value.
