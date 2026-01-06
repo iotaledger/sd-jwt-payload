@@ -36,7 +36,7 @@
 
 # SD-JWT Reference implementation
 
-Rust implementation of the [Selective Disclosure for JWTs (SD-JWT) **version 12**](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-12.html)
+Rust implementation of [RFC9901: Selective Disclosure for JSON Web Tokens (SD-JWT)](https://www.rfc-editor.org/rfc/rfc9901.html)
 
 ## Overview
 
@@ -141,7 +141,7 @@ Through the builder an issuer can require a specific key-binding that will be ve
     .require_key_binding(RequiredKeyBinding::Kid("key1".to_string()))
 ```
 
-Internally, builder's object now looks like:
+Internally, the builder's object now looks like:
 
 ```json
 {

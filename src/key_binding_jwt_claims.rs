@@ -19,7 +19,7 @@ use std::str::FromStr;
 
 pub const KB_JWT_HEADER_TYP: &str = "kb+jwt";
 
-/// Representation of a [KB-JWT](https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-12.html#name-key-binding-jwt).
+/// Representation of a [KB-JWT](https://www.rfc-editor.org/rfc/rfc9901.html#name-key-binding-jwt).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyBindingJwt(Jwt<KeyBindingJwtClaims>);
 
