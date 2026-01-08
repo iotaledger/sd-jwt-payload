@@ -1,5 +1,29 @@
 # Change Log
 
+## [0.5.0]
+Implement latest SD-JWT specification: [RFC9901](https://www.rfc-editor.org/rfc/rfc9901.html).
+
+## [0.4.0]
+
+### Added
+- `SdJwtPresentationBuilder::conceal_all` removes all concealable claims.
+- `SdJwtPresentationBuilder::disclose` undos the concealament of a previously concealed
+  claim.
+
+
+## [0.3.0]
+
+### Added
+- `JwsSigner` trait defining an interface for types that can produce JWS.
+- `KeyBindingJwt` type for handling KB-JWTs.
+- `KeyBindingJwtBuilder` type for creating KB-JWTs.
+- `SdJwtPresentationBuilder` for removing disclosable claims or adding a KB-JWT.
+
+### Changed
+- Replaced `SdObjectEncoder` with `SdJwtBuilder` that - through `JwsSigner` - allows
+  for the creation of a whole `SD-JWT` token, instead of just disclosures and a JWT
+  payload.
+
 ## [0.2.1]
 
 ### Added
