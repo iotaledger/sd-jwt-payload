@@ -180,3 +180,14 @@ async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
 
   Ok(())
 }
+
+#[tokio::test]
+async fn kb_jwt_sd_hash_is_correct() -> anyhow::Result<()> {
+  let sd_jwt = make_sd_jwt(json!({"key": "value"}), []).await;
+  let kb_jwt = make_kb_jwt(&sd_jwt, &Sha256Hasher).await;
+
+  let expected_sd_hash = Sha256Hasher.encoded_digest(&sd_jwt.to_string());
+  assert_eq!(expected_sd_hash, kb_jwt.claims().sd_hash);
+
+  Ok(())
+}
