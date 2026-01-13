@@ -97,13 +97,24 @@ impl<H: Hasher> SdJwtBuilder<H> {
     Ok(self)
   }
 
-  /// Sets the JWT header.
+  /// Sets the JWT headers.
   /// ## Notes
-  /// - if [`SdJwtBuilder::header`] is not called, the default header is used: ```json { "typ": "sd-jwt", "alg":
-  ///   "<algorithm used in SdJwtBuilder::finish>" } ```
+  /// - if [`SdJwtBuilder::headers`] is not called, the default header is used:
+  /// ```json
+  ///   {
+  ///     "typ": "sd-jwt",
+  ///     "alg": "<algorithm used in SdJwtBuilder::finish>"
+  ///   }
+  /// ```
   /// - `alg` is always replaced with the value passed to [`SdJwtBuilder::finish`].
-  pub fn header(mut self, header: JsonObject) -> Self {
+  pub fn headers(mut self, header: JsonObject) -> Self {
     self.header = header;
+    self
+  }
+
+  /// Adds a new header entry to the JWT headers.
+  pub fn header(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
+    self.header.insert(key.into(), value.into());
     self
   }
 

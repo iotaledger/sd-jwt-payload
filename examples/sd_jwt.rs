@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use josekit::jws::alg::hmac::HmacJwsSigner;
 use josekit::jws::JwsHeader;
 use josekit::jws::HS256;
+use josekit::jwt;
 use josekit::jwt::JwtPayload;
-use josekit::jwt::{self};
 use sd_jwt_payload::JsonObject;
 use sd_jwt_payload::JwsSigner;
 use sd_jwt_payload::KeyBindingJwtBuilder;
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .make_concealable("/nationalities/0")?
     .add_decoys("/nationalities", 1)?
     .add_decoys("", 2)?
-    .require_key_binding(sd_jwt_payload::RequiredKeyBinding::Kid("key1".to_string()))
+    .require_key_binding(sd_jwt_payload::RequiredKeyBinding::Kid("#key1".to_string()))
     .finish(&signer, "HS256")
     .await?;
 
@@ -75,20 +75,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let sd_jwt = received_sd_jwt.parse::<SdJwt>()?;
 
   let hasher = Sha256Hasher::new();
+
+  // The holder can withhold from a verifier any concealable claim by calling `conceal`.
+  let (mut presented_sd_jwt, _removed_disclosures) = sd_jwt
+    .into_presentation(&hasher)?
+    .conceal("/email")?
+    .conceal("/nationalities/0")?
+    .finish();
+  // The holder creates a key binding JWT to bind the SD-JWT to himself.
   let kb_jwt = KeyBindingJwtBuilder::new()
     .aud("https://verifier.example.com")
     .nonce("abcdefghi")
     .iat(164389238943)
-    .finish(&sd_jwt, &hasher, "HS256", &signer)
+    .header("kid", "#key1")
+    .finish(&presented_sd_jwt, &hasher, "HS256", &signer)
     .await?;
-
-  // The holder can withhold from a verifier any concealable claim by calling `conceal`.
-  let (presented_sd_jwt, _removed_disclosures) = sd_jwt
-    .into_presentation(&hasher)?
-    .conceal("/email")?
-    .conceal("/nationalities/0")?
-    .attach_key_binding_jwt(kb_jwt)
-    .finish()?;
+  presented_sd_jwt.attach_key_binding_jwt(kb_jwt);
 
   // The holder send its token to a verifier.
   let received_sd_jwt = presented_sd_jwt.presentation();

@@ -64,7 +64,7 @@ impl KeyBindingJwt {
 /// Builder-style struct to ease the creation of an [`KeyBindingJwt`].
 #[derive(Debug, Default, Clone)]
 pub struct KeyBindingJwtBuilder {
-  header: JsonObject,
+  headers: JsonObject,
   payload: JsonObject,
 }
 
@@ -77,14 +77,20 @@ impl KeyBindingJwtBuilder {
   /// Creates a new [`KeyBindingJwtBuilder`] using `object` as its payload.
   pub fn from_object(object: JsonObject) -> Self {
     Self {
-      header: JsonObject::default(),
+      headers: JsonObject::default(),
       payload: object,
     }
   }
 
-  /// Sets the JWT's header.
-  pub fn header(mut self, header: JsonObject) -> Self {
-    self.header = header;
+  /// Sets the JWT's headers.
+  pub fn headers(mut self, headers: JsonObject) -> Self {
+    self.headers = headers;
+    self
+  }
+
+  /// Adds a new header entry to the JWT headers.
+  pub fn header(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
+    self.headers.insert(key.into(), value.into());
     self
   }
 
@@ -151,7 +157,7 @@ impl KeyBindingJwtBuilder {
     let sd_hash = hasher.encoded_digest(&sd_jwt.to_string());
     claims.insert("sd_hash".to_string(), sd_hash.into());
 
-    let mut header = self.header;
+    let mut header = self.headers;
     header.insert("alg".to_string(), alg.to_owned().into());
     header
       .entry("typ")
