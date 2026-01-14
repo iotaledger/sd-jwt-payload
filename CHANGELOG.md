@@ -6,7 +6,7 @@
 - `SdJwtBuilder::headers` and `KbJwtBuilder::headers` to set the respective token's headers through a single object.
 
 ### Fixed
-- Fixed an issue that made KB-JWT attachment prone to errors. See [\#]() for more information.
+- Fixed an issue that made KB-JWT attachment prone to errors. See [\#23](https://github.com/iotaledger/sd-jwt-payload/pull/23) for more information.
 
 ### Changed
 - `SdJwtPresentationBuilder::attach_key_binding_jwt` has been removed in favor of `SdJwt::attach_key_binding_jwt`.
