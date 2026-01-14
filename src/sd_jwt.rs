@@ -77,7 +77,7 @@ impl SdJwt {
     }
   }
 
-  pub fn header(&self) -> &JsonObject {
+  pub fn headers(&self) -> &JsonObject {
     &self.jwt.header
   }
 
