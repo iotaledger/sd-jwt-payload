@@ -210,7 +210,7 @@ To attach a key-binding JWT (KB-JWT) the `KeyBindingJwtBuilder` struct can be us
 ```rust
   let mut sd_jwt = SdJwt::parse("...")?;
   // Can be used to check which key is required - if any.
-  let required_kb: Option<&RequiredKeyBinding> = sd_jwt.required_key_binding();
+  let required_kb: Option<&RequiredKeyBinding> = sd_jwt.required_key_bind();
 
   let signer = MyJwkSigner::new();
   let hasher = Sha256Hasher::new();
