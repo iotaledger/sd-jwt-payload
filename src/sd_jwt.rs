@@ -108,6 +108,14 @@ impl SdJwt {
     self.key_binding_jwt.as_ref()
   }
 
+  /// Attaches a [KeyBindingJwt] to this SD-JWT.
+  /// ## Notes
+  /// This method overwrites any existing [KeyBindingJwt] and does **not**
+  /// perform any sort of validation of the passed KB-JWT.
+  pub fn attach_key_binding_jwt(&mut self, kb_jwt: KeyBindingJwt) {
+    self.key_binding_jwt = Some(kb_jwt);
+  }
+
   /// Serializes the components into the final SD-JWT.
   pub fn presentation(&self) -> String {
     let disclosures = self.disclosures.iter().map(ToString::to_string).join("~");
@@ -278,20 +286,8 @@ impl SdJwtPresentationBuilder {
     Ok(self)
   }
 
-  /// Adds a [`KeyBindingJwt`] to this [`SdJwt`]'s presentation.
-  pub fn attach_key_binding_jwt(mut self, kb_jwt: KeyBindingJwt) -> Self {
-    self.sd_jwt.key_binding_jwt = Some(kb_jwt);
-    self
-  }
-
   /// Returns the resulting [`SdJwt`] together with all removed disclosures.
-  /// ## Errors
-  /// - Fails with [`Error::MissingKeyBindingJwt`] if this [`SdJwt`] requires a key binding but none was provided.
-  pub fn finish(self) -> Result<(SdJwt, Vec<Disclosure>)> {
-    if self.sd_jwt.required_key_bind().is_some() && self.key_binding_jwt.is_none() {
-      return Err(Error::MissingKeyBindingJwt);
-    }
-
+  pub fn finish(self) -> (SdJwt, Vec<Disclosure>) {
     // Put everything back in its place.
     let SdJwtPresentationBuilder {
       mut sd_jwt,
@@ -332,7 +328,7 @@ impl SdJwtPresentationBuilder {
     sd_jwt.jwt.claims.properties = obj;
     sd_jwt.disclosures = disclosures_to_keep;
 
-    Ok((sd_jwt, omitted_disclosures))
+    (sd_jwt, omitted_disclosures)
   }
 }
 

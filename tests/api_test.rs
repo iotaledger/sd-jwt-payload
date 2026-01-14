@@ -84,7 +84,7 @@ async fn concealing_parent_also_removes_all_sub_disclosures() -> anyhow::Result<
   )
   .await;
 
-  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish()?.1;
+  let removed_disclosures = sd_jwt.into_presentation(&hasher)?.conceal("/parent")?.finish().1;
   assert_eq!(removed_disclosures.len(), 3);
 
   Ok(())
@@ -102,7 +102,7 @@ async fn concealing_property_of_concealable_value_works() -> anyhow::Result<()> 
   sd_jwt
     .into_presentation(&hasher)?
     .conceal("/parent/property2/0")?
-    .finish()?;
+    .finish();
 
   Ok(())
 }
@@ -112,7 +112,7 @@ async fn conceal_all_works() -> anyhow::Result<()> {
   let hasher = Sha256Hasher::new();
   let sd_jwt = make_sd_jwt(json!({"key1": "value1", "key2": "value2"}), ["/key1", "/key2"]).await;
 
-  let (_, omitted_disclosures) = sd_jwt.into_presentation(&hasher)?.conceal_all().finish()?;
+  let (_, omitted_disclosures) = sd_jwt.into_presentation(&hasher)?.conceal_all().finish();
 
   assert_eq!(omitted_disclosures.len(), 2);
 
@@ -133,7 +133,7 @@ async fn disclose_works() -> anyhow::Result<()> {
     .conceal_all()
     .disclose("/parent/property1")?
     .disclose("/array/0")?
-    .finish()?;
+    .finish();
 
   assert_eq!(
     omitted_disclosures.pop().map(|d| d.claim_value),
@@ -159,7 +159,7 @@ async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
   let hasher = Sha256Hasher::new();
   let sd_jwt = make_sd_jwt(json!({"parent": {"property1": "value1", "property2": [1, 2, 3]}}), []).await;
   // Try to serialize & deserialize `sd_jwt`.
-  let sd_jwt = {
+  let mut sd_jwt = {
     let s = sd_jwt.to_string();
     s.parse::<SdJwt>()?
   };
@@ -167,20 +167,27 @@ async fn sd_jwt_without_disclosures_works() -> anyhow::Result<()> {
   assert!(sd_jwt.disclosures().is_empty());
   assert!(sd_jwt.key_binding_jwt().is_none());
 
-  let with_kb = sd_jwt
-    .clone()
-    .into_presentation(&hasher)?
-    .attach_key_binding_jwt(make_kb_jwt(&sd_jwt, &hasher).await)
-    .finish()?
-    .0;
+  let kb_jwt = make_kb_jwt(&sd_jwt, &hasher).await;
+  sd_jwt.attach_key_binding_jwt(kb_jwt);
   // Try to serialize & deserialize `with_kb`.
   let with_kb = {
-    let s = with_kb.to_string();
+    let s = sd_jwt.to_string();
     s.parse::<SdJwt>()?
   };
 
   assert!(with_kb.disclosures().is_empty());
   assert!(with_kb.key_binding_jwt().is_some());
+
+  Ok(())
+}
+
+#[tokio::test]
+async fn kb_jwt_sd_hash_is_correct() -> anyhow::Result<()> {
+  let sd_jwt = make_sd_jwt(json!({"key": "value"}), []).await;
+  let kb_jwt = make_kb_jwt(&sd_jwt, &Sha256Hasher).await;
+
+  let expected_sd_hash = Sha256Hasher.encoded_digest(&sd_jwt.to_string());
+  assert_eq!(expected_sd_hash, kb_jwt.claims().sd_hash);
 
   Ok(())
 }
